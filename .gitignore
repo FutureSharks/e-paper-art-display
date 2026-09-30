@@ -27,6 +27,8 @@
 # Fortran module files
 *.mod
 *.smod
+# ...but not Go's module file, which the rule above would otherwise hide.
+!go.mod
 
 # Compiled Static libraries
 *.lai
@@ -67,3 +69,21 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+secrets.h
+src/secrets.h
+tools/imgproc/imgproc
+
+# imgproc previews: the dithered result written next to each source image
+*.preview.jpg
+
+# Source artwork. The packed frames in artwork/processed/ are committed - the
+# device fetches those over raw.githubusercontent.com - but the originals are
+# large and are not needed to build or run anything.
+artwork/*.jpg
+artwork/*.jpeg
+artwork/*.JPG
+artwork/*.png
+
+# art-fetcher
+tools/art-fetcher/downloads/
+tools/art-fetcher/art-fetcher

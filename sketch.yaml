@@ -1,0 +1,26 @@
+default_profile: default
+
+profiles:
+  # Adafruit Feather ESP32-C6. No PSRAM and 512 KB SRAM is enough because the
+  # 960 KB frame is streamed to the panel, never buffered.
+  #
+  # huge_app: the WiFi + TLS stack alone is ~1.1 MB, which overflows the default
+  # 1.2 MB app slot. The device has no OTA and no filesystem, so the trade is
+  # free.
+  #
+  # CDCOnBoot=cdc: without it Serial is UART0 on GPIO16/17, which both hides the
+  # log (this board has no USB-UART bridge, only the C6's native USB) and takes
+  # the pin BUSY now uses.
+  default:
+    fqbn: esp32:esp32:adafruit_feather_esp32c6:PartitionScheme=huge_app,CDCOnBoot=cdc
+    port: /dev/cu.usbmodem1101 # change for your connection
+    libraries:
+      - dir: libs/el133
+      - dir: libs/artfeed
+      - dir: libs/roboto
+      - ArduinoLog (1.1.1)
+      - Adafruit MAX1704X (1.0.3)
+      - Adafruit BusIO (1.17.4)
+    platforms:
+      - platform: esp32:esp32 (3.3.11)
+        platform_index_url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
