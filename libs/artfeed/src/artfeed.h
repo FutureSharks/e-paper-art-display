@@ -73,6 +73,19 @@ bool artfeed_pick(const ArtfeedConfig &cfg, char *name, size_t name_len,
  * Drops the radio before the refresh, so WiFi is down on return either way. */
 bool artfeed_show(const ArtfeedConfig &cfg, const char *name);
 
+/* Why the last artfeed_pick() or artfeed_show() failed, short enough for an
+ * error screen: the URL it was fetching (empty if it failed before making a
+ * request) and a one-line reason - an HTTP status, a connection or TLS error,
+ * or a download of the wrong size. Only meaningful after one of them has
+ * returned false; the serial log has the full story. */
+struct ArtfeedError
+{
+    char url[256];
+    char reason[128];
+};
+
+const ArtfeedError &artfeed_last_error();
+
 /* Which manifest entry the next sequential pick will use, and how many were
  * seen last time. Both read back from NVS, for logging and diagnostics. */
 uint32_t artfeed_next_index();

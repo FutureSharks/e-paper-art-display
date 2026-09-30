@@ -143,9 +143,10 @@ static void sleep_for_minutes(uint32_t minutes, const char *why)
 }
 
 /* Put the error screen up, then sleep as sleep_for_minutes(). `what` is the
- * first line of the message; the second says when, if the clock is known, and
- * what happens next. Turn the radio off first. Never returns. */
-static void fail(const char *what, uint32_t minutes)
+ * headline; `detail`, if given, is one or more lines of specifics under it -
+ * the URL, the HTTP status - and the last line says when, if the clock is
+ * known, and what happens next. Turn the radio off first. Never returns. */
+static void fail(const char *what, const char *detail, uint32_t minutes)
 {
   status_led(STATUS_ERROR);
 
@@ -168,8 +169,10 @@ static void fail(const char *what, uint32_t minutes)
   else
     snprintf(next, sizeof(next), "trying again in %u min", (unsigned)minutes);
 
-  char message[128];
-  snprintf(message, sizeof(message), "%s\n%s%s", what, when, next);
+  char message[512];
+  const bool has_detail = detail != nullptr && detail[0] != '\0';
+  snprintf(message, sizeof(message), "%s\n%s%s%s%s", what, has_detail ? detail : "",
+           has_detail ? "\n" : "", when, next);
 
   if (!error_screen_show(message))
     Log.error("The error screen did not refresh either" CR);
@@ -198,20 +201,40 @@ static void on_artfeed_stage(ArtfeedStage stage)
   }
 }
 
+/* The specifics of an artfeed failure for the error screen: the reason, then
+ * the URL split after its last '/', so the file name gets a line to itself
+ * rather than being wrapped part-way through. */
+static void artfeed_detail(char *detail, size_t len)
+{
+  const ArtfeedError &err = artfeed_last_error();
+  const char *file = strrchr(err.url, '/');
+  if (file == nullptr)
+    snprintf(detail, len, "%s%s%s", err.reason, err.url[0] ? "\n" : "", err.url);
+  else
+    snprintf(detail, len, "%s\n%.*s\n%s", err.reason, (int)(file + 1 - err.url), err.url,
+             file + 1);
+}
+
 /* One attempt at the network-dependent part of startup: WiFi association then
  * the clock, which TLS needs to check certificate dates. Returns what failed,
- * for the error screen, or nullptr. */
-static const char *init_network()
+ * for the error screen, with the specifics in `detail`, or nullptr. */
+static const char *init_network(char *detail, size_t detail_len)
 {
   status_led(STATUS_WIFI);
   if (!wifi_connect())
+  {
+    snprintf(detail, detail_len, "Network \"%s\": %s", WIFI_SSID, wifi_failure_reason());
     return "Could not connect to WiFi";
+  }
 
   /* Resync every wake on a daily schedule: a day of RTC drift would otherwise
    * accumulate and walk the refresh away from DISPLAY_UPDATE_TIME. */
   status_led(STATUS_NTP);
   if (!time_set(DAILY_UPDATE))
+  {
+    snprintf(detail, detail_len, "No answer from %s", NTP_SERVER);
     return "Could not set the clock (NTP)";
+  }
 
   return nullptr;
 }
@@ -268,15 +291,16 @@ void setup()
     char what[40];
     snprintf(what, sizeof(what), "Battery low (%d%%) - please charge",
              (int)(battery.percent + 0.5f));
-    fail(what, SLEEP_FOREVER);
+    fail(what, nullptr, SLEEP_FOREVER);
     return;
   }
 
   const char *network_error = nullptr;
+  char detail[384] = "";
   for (int attempt = 1; attempt <= MAX_INIT_ATTEMPTS; attempt++)
   {
     Log.notice("Startup attempt %d of %d" CR, attempt, MAX_INIT_ATTEMPTS);
-    network_error = init_network();
+    network_error = init_network(detail, sizeof(detail));
     if (network_error == nullptr)
       break;
 
@@ -287,7 +311,7 @@ void setup()
 
   if (network_error != nullptr)
   {
-    fail(network_error, SLEEP_MINUTES);
+    fail(network_error, detail, SLEEP_MINUTES);
     return;
   }
 
@@ -302,7 +326,8 @@ void setup()
   if (!artfeed_pick(cfg, name, sizeof(name), &position, &count))
   {
     wifi_reset();
-    fail("Could not load the image list", SLEEP_MINUTES);
+    artfeed_detail(detail, sizeof(detail));
+    fail("Could not load the image list", detail, SLEEP_MINUTES);
     return;
   }
 
@@ -324,7 +349,8 @@ void setup()
   if (!shown && !refresh_started)
   {
     wifi_reset();
-    fail("Could not download the image", SLEEP_MINUTES);
+    artfeed_detail(detail, sizeof(detail));
+    fail("Could not download the image", detail, SLEEP_MINUTES);
     return;
   }
 

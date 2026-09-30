@@ -8,6 +8,7 @@
 #include <NetworkClientSecure.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <stdarg.h>
 #include "el133.h"
 
 /* The Mozilla root store that ships with arduino-esp32, embedded in the core's
@@ -28,6 +29,51 @@ static const size_t ARTFEED_MAX_ENTRIES = 512;
 /* Any clock at or past this (2023-11-14) is good enough to check a certificate
  * against. Below it, the clock has not been set since power-on. */
 static const time_t ARTFEED_CLOCK_SANE = 1700000000;
+
+static ArtfeedError last_error;
+
+const ArtfeedError &artfeed_last_error()
+{
+    return last_error;
+}
+
+/* Start the record for a request to `url`, clearing the last reason. */
+static void error_begin(const String &url)
+{
+    strlcpy(last_error.url, url.c_str(), sizeof(last_error.url));
+    last_error.reason[0] = '\0';
+}
+
+static void error_reason(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+static void error_reason(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(last_error.reason, sizeof(last_error.reason), fmt, args);
+    va_end(args);
+}
+
+/* The reason phrase for the statuses a static file host is likely to send,
+ * since HTTPClient only has text for its own negative codes. */
+static const char *http_reason(int code)
+{
+    switch (code)
+    {
+    case 301: return " Moved Permanently";
+    case 302: return " Found";
+    case 400: return " Bad Request";
+    case 401: return " Unauthorized";
+    case 403: return " Forbidden";
+    case 404: return " Not Found";
+    case 408: return " Request Timeout";
+    case 429: return " Too Many Requests";
+    case 500: return " Internal Server Error";
+    case 502: return " Bad Gateway";
+    case 503: return " Service Unavailable";
+    case 504: return " Gateway Timeout";
+    default:  return "";
+    }
+}
 
 ArtfeedConfig artfeed_default_config()
 {
@@ -75,13 +121,14 @@ static void artfeed_prepare(const ArtfeedConfig &cfg, NetworkClientSecure &clien
  * negative code is a transport failure (DNS, TCP, TLS), a positive one is an
  * HTTP status and the server said something worth reading. A 404 body of
  * "404: Not Found" means the file is not on the host - most often because the
- * commit adding it has not been pushed. */
+ * commit adding it has not been pushed. The short form goes in last_error. */
 static void artfeed_report_failure(NetworkClientSecure &client, HTTPClient &http,
                                    const char *what, const char *url, int code)
 {
+    const String code_text = http.errorToString(code);
     Log.error("%s failed" CR, what);
     Log.error("  url    %s" CR, url);
-    Log.error("  code   %d (%s)" CR, code, http.errorToString(code).c_str());
+    Log.error("  code   %d (%s)" CR, code, code_text.c_str());
 
     if (code < 0)
     {
@@ -94,9 +141,17 @@ static void artfeed_report_failure(NetworkClientSecure &client, HTTPClient &http
         Log.error("  wifi   %s, rssi %d dBm, dns %s" CR,
                   WiFi.isConnected() ? "connected" : "DISCONNECTED", (int)WiFi.RSSI(),
                   WiFi.dnsIP().toString().c_str());
+
+        if (!WiFi.isConnected())
+            error_reason("Error %d: %s (WiFi dropped)", code, code_text.c_str());
+        else if (tls != 0 && err[0] != '\0')
+            error_reason("Error %d: %s (TLS: %s)", code, code_text.c_str(), err);
+        else
+            error_reason("Error %d: %s", code, code_text.c_str());
     }
     else
     {
+        error_reason("HTTP %d%s", code, http_reason(code));
         Log.error("  length %d" CR, http.getSize());
         String body = http.getString();
         if (body.length() > 160)
@@ -152,9 +207,11 @@ bool artfeed_pick(const ArtfeedConfig &cfg, char *name, size_t name_len, uint32_
     artfeed_prepare(cfg, client, http);
 
     Log.notice("GET %s" CR, url.c_str());
+    error_begin(url);
     if (!http.begin(client, url))
     {
         Log.error("Cannot parse url %s" CR, url.c_str());
+        error_reason("Not a valid URL");
         return false;
     }
 
@@ -207,6 +264,7 @@ bool artfeed_pick(const ArtfeedConfig &cfg, char *name, size_t name_len, uint32_
         String preview = body.substring(0, body.length() < 160 ? body.length() : 160);
         preview.replace("\n", " ");
         Log.error("Manifest has no usable entries; body was: %s" CR, preview.c_str());
+        error_reason("Manifest has no usable entries (%u bytes)", (unsigned)body.length());
         return false;
     }
     Log.notice("Manifest lists %u image(s)" CR, (unsigned)count);
@@ -253,6 +311,8 @@ bool artfeed_pick(const ArtfeedConfig &cfg, char *name, size_t name_len, uint32_
     if (pick.length() + 1 > name_len)
     {
         Log.error("Name \"%s\" too long for buffer" CR, pick.c_str());
+        error_reason("Image name is over %u characters: %s", (unsigned)(name_len - 1),
+                     pick.c_str());
         return false;
     }
     strncpy(name, pick.c_str(), name_len - 1);
@@ -285,9 +345,11 @@ bool artfeed_show(const ArtfeedConfig &cfg, const char *name)
     artfeed_prepare(cfg, client, http);
 
     Log.notice("GET %s" CR, url.c_str());
+    error_begin(url);
     if (!http.begin(client, url))
     {
         Log.error("Cannot parse url %s" CR, url.c_str());
+        error_reason("Not a valid URL");
         return false;
     }
 
@@ -306,6 +368,8 @@ bool artfeed_show(const ArtfeedConfig &cfg, const char *name)
          * for different geometry. */
         Log.error("Wrong length: %d bytes, expected %u - not a packed frame?" CR, size,
                   (unsigned)EL133_STREAM_BYTES);
+        error_reason("Got %d bytes, expected %u - not a packed frame?", size,
+                     (unsigned)EL133_STREAM_BYTES);
         http.end();
         return false;
     }
@@ -357,6 +421,9 @@ bool artfeed_show(const ArtfeedConfig &cfg, const char *name)
             {
                 Log.error("Connection closed with %u bytes of half %d outstanding" CR,
                           (unsigned)remaining, half);
+                error_reason("Connection closed after %u of %u bytes",
+                             (unsigned)(half * EL133_HALF_BYTES + EL133_HALF_BYTES - remaining),
+                             (unsigned)EL133_STREAM_BYTES);
                 ok = false;
                 break;
             }
@@ -364,6 +431,10 @@ bool artfeed_show(const ArtfeedConfig &cfg, const char *name)
             {
                 Log.error("Stalled for %u ms with %u bytes of half %d outstanding" CR,
                           (unsigned)(millis() - lastData), (unsigned)remaining, half);
+                error_reason("Download stalled for %u s after %u of %u bytes",
+                             (unsigned)((millis() - lastData) / 1000),
+                             (unsigned)(half * EL133_HALF_BYTES + EL133_HALF_BYTES - remaining),
+                             (unsigned)EL133_STREAM_BYTES);
                 ok = false;
                 break;
             }
@@ -391,5 +462,10 @@ bool artfeed_show(const ArtfeedConfig &cfg, const char *name)
     Log.verbose("Radio off before refresh" CR);
 
     report(cfg, ARTFEED_STAGE_REFRESH);
-    return el133_refresh();
+    if (!el133_refresh())
+    {
+        error_reason("The panel did not refresh");
+        return false;
+    }
+    return true;
 }

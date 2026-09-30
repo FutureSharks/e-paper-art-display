@@ -5,12 +5,8 @@
 #include <time.h>
 
 #include "config.h"
+#include "fonts.h"
 #include "text_box.h"
-
-/* Only this one size is linked; roboto_font(size) would pull in all of them.
- * Swap both lines for another roboto<N>.h to change the size. */
-#include "roboto10.h"
-static const GFXfont &FONT = Roboto10;
 
 /* Padding between the text and the edge of its white box. */
 static const int PAD_X = 8;
@@ -59,7 +55,7 @@ void status_line_begin(uint32_t position, uint32_t count, const BatteryStatus *b
   if (text[0] == '\0')
     return;
 
-  if (text_box_begin(&FONT, PAD_X, PAD_Y, text))
+  if (text_box_begin(&FONT_SMALL, nullptr, PAD_X, PAD_Y, text))
     Log.notice("Status line: \"%s\"" CR, text);
 }
 
