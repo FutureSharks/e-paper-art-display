@@ -8,11 +8,8 @@
 
 #include "el133.h"
 #include "error_image.h"
+#include "fonts.h"
 #include "text_box.h"
-
-/* As with the status line, only this one size is linked. */
-#include "roboto24.h"
-static const GFXfont &FONT = Roboto24;
 
 static const int PAD_X = 24;
 static const int PAD_Y = 16;
@@ -96,7 +93,7 @@ bool error_screen_show(const char *message)
   el133_init_panel();
 
   if (message != nullptr && message[0] != '\0')
-    text_box_begin(&FONT, PAD_X, PAD_Y, message);
+    text_box_begin(&FONT_LARGE, &FONT_SMALL, PAD_X, PAD_Y, message);
 
   const bool streamed = stream_error_image();
   text_box_end();
