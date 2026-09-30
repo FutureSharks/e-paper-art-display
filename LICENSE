@@ -19,3 +19,15 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+The above applies to this repository except for the following files, which are
+a Go port of parts of epdoptimize (https://github.com/paperlesspaper/epdoptimize),
+Copyright 2025 Robert Guehne, and are licensed under the Apache License,
+Version 2.0:
+
+    tools/imgproc/
+
+A copy of that licence is in tools/imgproc/LICENSE-APACHE-2.0, and
+tools/imgproc/NOTICE records what was taken and how it was changed.

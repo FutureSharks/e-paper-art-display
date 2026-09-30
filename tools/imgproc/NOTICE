@@ -1,0 +1,56 @@
+tools/imgproc contains a Go port of parts of epdoptimize.
+
+    epdoptimize
+    https://github.com/paperlesspaper/epdoptimize
+    Copyright 2025 Robert Guehne (Robert Gühne)
+    Licensed under the Apache License, Version 2.0
+
+A verbatim copy of that licence is in LICENSE-APACHE-2.0 in this directory.
+The rest of this repository is MIT licensed; see ../../LICENSE.
+
+Files in this directory derived from epdoptimize, and so covered by the
+Apache License, Version 2.0:
+
+    palette.go   colour-space maths and the calibrated display palettes,
+                 from src/dither/processing.ts and
+                 src/dither/data/default-palettes.json
+    tone.go      the tone pipeline - paper normalisation, tone mapping,
+                 LAB dynamic range compression, level compression -
+                 from src/dither/processing.ts
+    dither.go    the diffusion kernels and the palette matching modes,
+                 from src/dither/data/diffusion-maps.ts and
+                 src/dither/functions/find-closest-palette-color.ts
+    preset.go    the processing presets, from src/dither/processing.ts
+
+main.go and dither_test.go are original to this repository and are MIT
+licensed, as is everything else outside this directory.
+
+Changes made to the original work
+---------------------------------
+
+The ported files are not a verbatim copy. As required by section 4(b) of
+the licence, the changes are:
+
+  * Translated from TypeScript to Go, and from operating on a browser
+    canvas ImageData to operating on a plain RGB byte slice with a stride
+    of 3 rather than 4.
+
+  * Error diffusion was rewritten around a three-row ring buffer instead
+    of a full-image error buffer, so that source images of any size can be
+    dithered without allocating hundreds of megabytes.
+
+  * Added a "weighted" colour matching mode, which is this repository's own
+    earlier brightness-weighted RGB distance and has no equivalent upstream.
+
+  * Added a "none" preset, and renamed the palettes to the naming scheme
+    used by this tool's -palette flag. Added a "pimoroni" palette, which is
+    this repository's own pair of reference palettes, not upstream's.
+
+  * Omitted, rather than ported: the "clarity" local-contrast stage, the
+    "fast" dynamic-range-compression path, the WebAssembly kernels, the
+    web worker scheduling, the ordered/random/blue-noise/Riemersma/
+    simple2D/hueMix/coverage dithering modes, the image-style classifier
+    and the automatic preset recommender.
+
+  * The palette entries were reduced to the six inks of the EL133UF1 panel
+    and reordered to that controller's colour-code order.
