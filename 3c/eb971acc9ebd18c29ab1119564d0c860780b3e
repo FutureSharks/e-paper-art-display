@@ -1,0 +1,84 @@
+go.mod
+  h_0add7ee37ebac2 1-3
+tools/imgproc/main.go
+  s_61e65044e71ac0::t_d506fa9417eee3 24
+  s_61e65044e71ac0::t_1cc270f51fb9d3 1-23,25-643
+src/config.h
+  h_0add7ee37ebac2 1-51
+libs/el133/library.properties
+  h_0add7ee37ebac2 1-9
+README.md
+  s_58e36cc5428e38::t_e4d54a7770f20c 78-79
+  s_58e36cc5428e38::t_67f83bd4660137 82
+  s_58e36cc5428e38::t_eab8c6446ff5b2 39
+  s_58e36cc5428e38::t_ed2cf8f9c27942 53
+  s_58e36cc5428e38::t_7b549af847cd68 61
+  s_58e36cc5428e38::t_b96e3cb6bec5e3 56-57
+  s_58e36cc5428e38::t_852b10c043ff3e 81
+  s_2f38e4abe2add5::t_bd5373de5881a6 25-26
+  s_58e36cc5428e38::t_83ace8cc691ac1 29,31,33-34,37
+  s_58e36cc5428e38::t_440599e2902a01 69,72-74
+  s_58e36cc5428e38::t_79b53b1039bd8d 6
+  s_58e36cc5428e38::t_d64860b5fe873a 63
+  s_58e36cc5428e38::t_9861e5a74efe5e 15-19,23
+  h_0add7ee37ebac2 2-3,5,7-14,20-22,24,27-28,30,32,35-36,38,40-52,54-55,58-60,62,64-68,70-71,75-77,80,83-87
+libs/artfeed/library.properties
+  h_0add7ee37ebac2 1-9
+tools/art-fetcher/README.md
+  s_2f38e4abe2add5::t_5f81b3a45bce13 3,8,10-11
+  s_2f38e4abe2add5::t_a0958561619899 1,14-17
+  s_2f38e4abe2add5::t_f8f2368158a4a2 5-6,9
+  s_2f38e4abe2add5::t_d21cb286888d5e 2
+  s_2f38e4abe2add5::t_7ef8ae6a2884b2 4
+  s_2f38e4abe2add5::t_fc789c0c3e7d28 7
+  s_2f38e4abe2add5::t_059bb952fed57b 12-13
+.gitignore
+  s_2f38e4abe2add5::t_a0958561619899 86-89
+  h_0add7ee37ebac2 30-31,72-85
+tools/art-fetcher/main.go
+  s_2f38e4abe2add5::t_5f81b3a45bce13 12,134,628
+  s_2f38e4abe2add5::t_0de03e68c2c593 1-11,13-133,135-627,629-671
+libs/roboto/library.properties
+  h_0add7ee37ebac2 1-9
+LICENSE
+  h_0add7ee37ebac2 22-33
+tools/imgproc/README.md
+  s_61e65044e71ac0::t_d506fa9417eee3 1-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "3ceb971acc9ebd18c29ab1119564d0c860780b3e",
+  "prompts": {},
+  "humans": {
+    "h_0add7ee37ebac2": {
+      "author": "Max Williams <max-rocket-internet@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_2f38e4abe2add5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6fce90e3-a5c4-4aa5-b382-bf12b403c045",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Max Williams <max-rocket-internet@users.noreply.github.com>"
+    },
+    "s_58e36cc5428e38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ee5204b-ae34-46c0-9b50-a16174f2d9af",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Max Williams <max-rocket-internet@users.noreply.github.com>"
+    },
+    "s_61e65044e71ac0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b36bd12d-f12d-43ae-90f8-e0b2daded735",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Max Williams <max-rocket-internet@users.noreply.github.com>"
+    }
+  }
+}
