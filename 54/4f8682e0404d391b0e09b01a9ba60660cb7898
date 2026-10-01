@@ -1,0 +1,15 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "544f8682e0404d391b0e09b01a9ba60660cb7898",
+  "prompts": {},
+  "humans": {
+    "h_0add7ee37ebac2": {
+      "author": "Max Williams <max-rocket-internet@users.noreply.github.com>"
+    },
+    "h_61c37ecb9a0034": {
+      "author": "Max Williams <futuresharks@gmail.com>"
+    }
+  }
+}
