@@ -1,0 +1,32 @@
+libs/artfeed/src/artfeed.cpp
+  s_df61fd0209bac6::t_8df673c82b7350 460-463
+e-paper-art-display.ino
+  s_df61fd0209bac6::t_cdf567e7407752 370-373,375-393
+  s_df61fd0209bac6::t_5ef549899a2f88 394-395
+src/config.h
+  h_61c37ecb9a0034 13,28-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "f78578bbac07bd8f9941c4e42c4929637aa9dde8",
+  "prompts": {},
+  "humans": {
+    "h_0add7ee37ebac2": {
+      "author": "Max Williams <max-rocket-internet@users.noreply.github.com>"
+    },
+    "h_61c37ecb9a0034": {
+      "author": "Max Williams <futuresharks@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_df61fd0209bac6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "291aaf89-2082-4f99-be46-88ae541e8047",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Max Williams <futuresharks@gmail.com>"
+    }
+  }
+}
