@@ -1,0 +1,40 @@
+src/builtin_led.cpp
+  s_d950b45f20ba39::t_8cabd4b7b97312 1-55
+src/builtin_led.h
+  s_d950b45f20ba39::t_39235424b102bb 1-24
+README.md
+  h_61c37ecb9a0034 5,7,15,19,41,58-61,70-75,88
+e-paper-art-display.ino
+  s_d950b45f20ba39::t_6742013b431298 23
+  s_d950b45f20ba39::t_47f9f24bf4d857 117
+  s_d950b45f20ba39::t_a1278b799dfcd1 77-81
+  s_d950b45f20ba39::t_bafadc8d330a44 201,206
+  s_d950b45f20ba39::t_18635464a202f2 254-255
+  s_d950b45f20ba39::t_2258b8da71c301 330
+  s_d950b45f20ba39::t_bb3554e325f666 118
+  s_d950b45f20ba39::t_aff311087ec8bb 331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "f45971f20b09f3dfaef829fd210aa34bda9977c1",
+  "prompts": {},
+  "humans": {
+    "h_0add7ee37ebac2": {
+      "author": "Max Williams <max-rocket-internet@users.noreply.github.com>"
+    },
+    "h_61c37ecb9a0034": {
+      "author": "Max Williams <futuresharks@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_d950b45f20ba39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fb5af38e-b0a3-485c-abf2-248724d27a38",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Max Williams <futuresharks@gmail.com>"
+    }
+  }
+}
