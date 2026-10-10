@@ -20,6 +20,7 @@
 #include "artfeed.h"
 #include "el133.h"
 #include "src/battery.h"
+#include "src/builtin_led.h"
 #include "src/config.h"
 #include "src/error_screen.h"
 #include "src/power_rail.h"
@@ -73,6 +74,11 @@ static const uint32_t DAILY_MIN_GAP_S = 60 * SECONDS_PER_MINUTE;
 static const int MAX_INIT_ATTEMPTS = 5;
 static const uint32_t INIT_RETRY_DELAY_MS = 5000;
 
+/* Built-in LED flash periods: slower once WiFi + NTP are up, faster while the
+ * manifest/image are downloading. */
+static const uint32_t LED_FLASH_WAITING_MS = 600;
+static const uint32_t LED_FLASH_DOWNLOADING_MS = 150;
+
 /* Why the chip started. Worth logging every boot: with USB CDC, any reset
  * drops the serial port, so a crash mid-refresh looks identical to unplugging
  * the cable. ESP_RST_BROWNOUT here means the 3V3 rail collapsed - almost
@@ -107,6 +113,8 @@ static void sleep_for_seconds(uint32_t seconds, const char *why)
     Log.notice("%s; sleeping %dh %02dm %02ds" CR, why, (int)(seconds / 3600),
                (int)(seconds / 60 % 60), (int)(seconds % 60));
   Serial.flush();
+
+  builtin_led_off();
 
 #if !DEEP_SLEEP
   if (seconds == SLEEP_FOREVER)
@@ -190,10 +198,12 @@ static void on_artfeed_stage(ArtfeedStage stage)
   case ARTFEED_STAGE_MANIFEST:
   case ARTFEED_STAGE_DOWNLOAD:
     status_led(STATUS_FETCH);
+    builtin_led_flash(LED_FLASH_DOWNLOADING_MS);
     break;
   case ARTFEED_STAGE_REFRESH:
     refresh_started = true;
     status_led(STATUS_DISPLAY);
+    builtin_led_off();
     /* Start recording the cell voltage: this is the load that browns the
      * board out, and the result is only readable on the next boot. */
     battery_monitor_start();
@@ -241,6 +251,8 @@ static const char *init_network(char *detail, size_t detail_len)
 
 void setup()
 {
+  builtin_led_begin();
+
   Serial.begin(115200);
   unsigned long serial_start = millis();
   while (!Serial && (millis() - serial_start) < 3000)
@@ -314,6 +326,8 @@ void setup()
     fail(network_error, detail, SLEEP_MINUTES);
     return;
   }
+
+  builtin_led_flash(LED_FLASH_WAITING_MS);
 
   ArtfeedConfig cfg = artfeed_default_config();
   cfg.base_url = ART_BASE_URL;
