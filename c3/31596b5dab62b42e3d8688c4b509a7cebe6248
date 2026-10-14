@@ -1,0 +1,68 @@
+.gitignore
+  s_c36bec04ccd559::t_de6d460624c72c 78
+e-paper-art-display.ino
+  s_8df4724fd0c663::t_18a306ec36b541 39-43,69-70,132-133,141-143,154-156,158-159,161-175,187,189,191-192,205-207,311,331,347,358,370,393
+libs/artfeed/src/artfeed.cpp
+  s_b72c08d2125584::t_e160f9a96865c5 243-244,247-249,263-264
+libs/artfeed/src/artfeed.h
+  s_b72c08d2125584::t_dac51d9fcaed63 7-8,51-53
+src/battery.cpp
+  s_d7cb10581a9052::t_43e73f0492fee3 9,67-74
+src/config.h
+  s_8df4724fd0c663::t_91a6e22647787d 17,19-24,29-30,44
+src/power_rail.h
+  s_d7cb10581a9052::t_871e52b2f38d5d 6-7,9-12
+src/status_line.cpp
+  s_b72c08d2125584::t_dd967371c57330 22-23,27-28,36-39
+src/status_line.h
+  s_b72c08d2125584::t_bb2d9e8e64884f 10-13,20-24
+tools/imgproc/README.md
+  s_c36bec04ccd559::t_0e6eb620b90e83 14,20-31,39-42,45-48
+tools/imgproc/main.go
+  s_c36bec04ccd559::t_60c858b157b3e1 24,27-32,47-49,69-76,124-126,161,195-197,200,228-235,239-261,263,416-419,507-512,623-629,631,639-640,643
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "c331596b5dab62b42e3d8688c4b509a7cebe6248",
+  "prompts": {},
+  "humans": {
+    "h_61c37ecb9a0034": {
+      "author": "Max Williams <futuresharks@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_8df4724fd0c663": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "03cb1069-9fa1-43b3-9114-4309342059ff",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Max Williams <futuresharks@gmail.com>"
+    },
+    "s_b72c08d2125584": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3f02a586-b131-4270-b2d8-fa5b385261e1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Max Williams <futuresharks@gmail.com>"
+    },
+    "s_c36bec04ccd559": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c682a2e4-dea2-422f-8328-6b1375a73718",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Max Williams <futuresharks@gmail.com>"
+    },
+    "s_d7cb10581a9052": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dbc70e71-c84e-4f97-bfa4-eba97ec39203",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Max Williams <futuresharks@gmail.com>"
+    }
+  }
+}
