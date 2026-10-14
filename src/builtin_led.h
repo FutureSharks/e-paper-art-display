@@ -4,9 +4,8 @@
 #include <stdint.h>
 
 /*
- * Coarse progress feedback on the board's built-in LED. Unlike status_led.h
- * (the NeoPixel, DEBUG_MODE only), this runs in every build: it's a single
- * GPIO with no extra rail to power.
+ * Coarse progress feedback on the board's built-in LED. It runs in every
+ * build: it's a single GPIO with no extra rail to power.
  *
  * Flashing is driven by an esp_timer so it keeps going through the blocking
  * WiFi/NTP/HTTPS calls in setup() rather than only updating between them.

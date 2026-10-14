@@ -6,6 +6,7 @@
 #include <Wire.h>
 
 #include "config.h"
+#include "power_rail.h"
 
 // Below this the gauge is reading a floating pin rather than a cell.
 static const float BATTERY_MIN_PLAUSIBLE_V = 2.5f;
@@ -63,6 +64,14 @@ static void wait_for_first_conversion()
 
 bool battery_begin()
 {
+  /* The gauge itself runs from the cell, but the SDA/SCL pull-ups sit on the
+   * GPIO20 switched rail along with the STEMMA QT port and NeoPixel. With the
+   * rail down the bus lines are clamped low and the gauge cannot answer, so
+   * bring it up before the bus is initialised - starting Wire on a dead bus and
+   * enabling the rail afterwards is not enough. It stays up for the rest of the
+   * cycle, since the gauge is read again during the refresh, and is dropped
+   * before deep sleep. */
+  power_rail_on();
   Wire.begin();
 
   if (gauge.attach(&Wire))
@@ -72,25 +81,6 @@ bool battery_begin()
     gauge_ready = true;
     return true;
   }
-
-#ifdef PIN_NEOPIXEL_I2C_POWER
-  /* GPIO20 switches the STEMMA QT rail on this board. The onboard gauge should
-   * sit on the unswitched side, so this is only a fallback - left off by
-   * default because it also powers the NeoPixel, which costs current we would
-   * rather not spend on a battery device. */
-  Log.verbose("Gauge silent; enabling the switched I2C rail and retrying" CR);
-  pinMode(PIN_NEOPIXEL_I2C_POWER, OUTPUT);
-  digitalWrite(PIN_NEOPIXEL_I2C_POWER, HIGH);
-  delay(50);
-
-  if (gauge.attach(&Wire))
-  {
-    Log.verbose("MAX17048 found, chip ID 0x%x" CR, gauge.getChipID());
-    wait_for_first_conversion();
-    gauge_ready = true;
-    return true;
-  }
-#endif
 
   Log.warning("No MAX17048 on I2C; battery monitoring disabled" CR);
   gauge_ready = false;

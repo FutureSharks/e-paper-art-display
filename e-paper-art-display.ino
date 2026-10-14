@@ -27,7 +27,6 @@
 #include "src/secrets.h"
 #include "src/setup_time.h"
 #include "src/setup_wifi.h"
-#include "src/status_led.h"
 #include "src/status_line.h"
 
 static const uint64_t US_PER_SECOND = 1000000ULL;
@@ -36,6 +35,11 @@ static const uint32_t SECONDS_PER_MINUTE = 60;
 
 /* For sleep_for_minutes(): no timer, so only a reset wakes the board. */
 static const uint32_t SLEEP_FOREVER = 0;
+
+/* SLEEP_MINUTES 0 skips sleep entirely: pause this long after each image (or
+ * failure), then restart straight into the next. Overrides DISPLAY_UPDATE_TIME. */
+static constexpr bool NO_SLEEP = SLEEP_MINUTES == 0;
+static const uint32_t NO_SLEEP_PAUSE_S = 5;
 
 /* DISPLAY_UPDATE_TIME as minutes past midnight, NO_UPDATE_TIME for "", or
  * BAD_UPDATE_TIME if it is not a 24 h "HH:MM". Parsed at compile time so a
@@ -62,7 +66,8 @@ static constexpr int parse_update_time(const char *s)
 static constexpr int UPDATE_TIME = parse_update_time(DISPLAY_UPDATE_TIME);
 static_assert(UPDATE_TIME != BAD_UPDATE_TIME,
               "DISPLAY_UPDATE_TIME must be a 24 h \"HH:MM\", or \"\" to use SLEEP_MINUTES");
-static constexpr bool DAILY_UPDATE = UPDATE_TIME != NO_UPDATE_TIME;
+/* SLEEP_MINUTES 0 wins over a daily time: the point of it is to cycle. */
+static constexpr bool DAILY_UPDATE = UPDATE_TIME != NO_UPDATE_TIME && !NO_SLEEP;
 
 /* After a daily refresh, the next one is at least this far off. The RTC drifts
  * over a day of deep sleep, so the frame can wake a little before the set time;
@@ -124,22 +129,18 @@ static void sleep_for_seconds(uint32_t seconds, const char *why)
       delay(1000);
   }
 
-  /* Stay powered so the log can be read and the last stage colour stays lit,
-   * then restart to get the clean slate a deep-sleep wake would have given. */
+  /* Stay powered so the log can be read, then restart to get the clean slate
+   * a deep-sleep wake would have given. */
   Log.notice("DEEP_SLEEP off: staying awake, then restarting" CR);
   delay(seconds * MS_PER_SECOND);
   Serial.flush();
   esp_restart();
 #else
-  /* A NeoPixel holds its colour until it loses power, so blank it before
-   * sleeping. A no-op unless DEBUG_MODE lit it. */
-  status_led_off();
-
   if (seconds != SLEEP_FOREVER)
     esp_sleep_enable_timer_wakeup((uint64_t)seconds * US_PER_SECOND);
-  /* Drop the STEMMA QT / NeoPixel regulator and latch it off for the duration
-   * of the sleep. Nothing on that rail is needed while the frame is idle, and
-   * the Arduino core turns it back on for us at the next boot. */
+  /* Drop the STEMMA QT / I2C pull-up regulator and latch it off for the
+   * duration of the sleep. Nothing on that rail is needed while the frame is
+   * idle, and battery_begin() turns it back on at the next boot. */
   power_rail_off_for_deep_sleep();
   esp_deep_sleep_start();
 #endif
@@ -150,14 +151,28 @@ static void sleep_for_minutes(uint32_t minutes, const char *why)
   sleep_for_seconds(minutes * SECONDS_PER_MINUTE, why);
 }
 
-/* Put the error screen up, then sleep as sleep_for_minutes(). `what` is the
- * headline; `detail`, if given, is one or more lines of specifics under it -
- * the URL, the HTTP status - and the last line says when, if the clock is
- * known, and what happens next. Turn the radio off first. Never returns. */
-static void fail(const char *what, const char *detail, uint32_t minutes)
+/* Wait out SLEEP_MINUTES before the next image or retry. With NO_SLEEP that is
+ * a short pause and a restart, staying awake. Never returns. */
+static void sleep_until_next_cycle(const char *why)
 {
-  status_led(STATUS_ERROR);
+  if (!NO_SLEEP)
+    sleep_for_minutes(SLEEP_MINUTES, why);
 
+  Log.notice("%s; SLEEP_MINUTES is 0, restarting in %u s" CR, why,
+             (unsigned)NO_SLEEP_PAUSE_S);
+  builtin_led_off();
+  delay(NO_SLEEP_PAUSE_S * MS_PER_SECOND);
+  Serial.flush();
+  esp_restart();
+}
+
+/* Put the error screen up, then either sleep_until_next_cycle() to try again
+ * or, if `retry` is false, sleep until reset. `what` is the headline;
+ * `detail`, if given, is one or more lines of specifics under it - the URL, the
+ * HTTP status - and the last line says when, if the clock is known, and what
+ * happens next. Turn the radio off first. Never returns. */
+static void fail(const char *what, const char *detail, bool retry)
+{
   char when[24] = "";
   if (time_valid())
   {
@@ -169,9 +184,12 @@ static void fail(const char *what, const char *detail, uint32_t minutes)
     strftime(when, sizeof(when), "%d %b %H:%M - ", &local);
   }
 
+  const uint32_t minutes = SLEEP_MINUTES;
   char next[40];
-  if (minutes == SLEEP_FOREVER)
+  if (!retry)
     snprintf(next, sizeof(next), "stopped, press reset to restart");
+  else if (NO_SLEEP)
+    snprintf(next, sizeof(next), "trying again in %u s", (unsigned)NO_SLEEP_PAUSE_S);
   else if (minutes >= 120 && minutes % 60 == 0)
     snprintf(next, sizeof(next), "trying again in %u h", (unsigned)(minutes / 60));
   else
@@ -184,7 +202,9 @@ static void fail(const char *what, const char *detail, uint32_t minutes)
 
   if (!error_screen_show(message))
     Log.error("The error screen did not refresh either" CR);
-  sleep_for_minutes(minutes, what);
+  if (retry)
+    sleep_until_next_cycle(what);
+  sleep_for_minutes(SLEEP_FOREVER, what);
 }
 
 /* Set once the frame has downloaded and the panel is refreshing, so a failed
@@ -197,12 +217,10 @@ static void on_artfeed_stage(ArtfeedStage stage)
   {
   case ARTFEED_STAGE_MANIFEST:
   case ARTFEED_STAGE_DOWNLOAD:
-    status_led(STATUS_FETCH);
     builtin_led_flash(LED_FLASH_DOWNLOADING_MS);
     break;
   case ARTFEED_STAGE_REFRESH:
     refresh_started = true;
-    status_led(STATUS_DISPLAY);
     builtin_led_off();
     /* Start recording the cell voltage: this is the load that browns the
      * board out, and the result is only readable on the next boot. */
@@ -230,7 +248,6 @@ static void artfeed_detail(char *detail, size_t len)
  * for the error screen, with the specifics in `detail`, or nullptr. */
 static const char *init_network(char *detail, size_t detail_len)
 {
-  status_led(STATUS_WIFI);
   if (!wifi_connect())
   {
     snprintf(detail, detail_len, "Network \"%s\": %s", WIFI_SSID, wifi_failure_reason());
@@ -239,7 +256,6 @@ static const char *init_network(char *detail, size_t detail_len)
 
   /* Resync every wake on a daily schedule: a day of RTC drift would otherwise
    * accumulate and walk the refresh away from DISPLAY_UPDATE_TIME. */
-  status_led(STATUS_NTP);
   if (!time_set(DAILY_UPDATE))
   {
     snprintf(detail, detail_len, "No answer from %s", NTP_SERVER);
@@ -261,16 +277,6 @@ void setup()
   Log.begin(LOG_LEVEL, &Serial);
   Log.notice("=== e-paper-art-display ===" CR);
 
-  status_led_begin();
-
-#if !DEBUG_MODE
-  /* The core brings the STEMMA QT / NeoPixel regulator up at boot. Nothing in
-   * a release build uses it, so drop it for the whole cycle, not just for the
-   * sleep. battery_begin() re-enables it only if the gauge cannot be found on
-   * the unswitched side. */
-  power_rail_off();
-#endif
-
   esp_reset_reason_t reason = esp_reset_reason();
   if (reason == ESP_RST_BROWNOUT)
     Log.error("Last reset: %s" CR, reset_reason_name(reason));
@@ -282,7 +288,6 @@ void setup()
   /* Check the cell before doing anything expensive. A refresh is ~35 s of the
    * panel's boost converters at full tilt; browning out during one leaves a
    * half-written frame on the glass. */
-  status_led(STATUS_BATTERY);
   battery_begin();
   battery_log();
 
@@ -303,7 +308,7 @@ void setup()
     char what[40];
     snprintf(what, sizeof(what), "Battery low (%d%%) - please charge",
              (int)(battery.percent + 0.5f));
-    fail(what, nullptr, SLEEP_FOREVER);
+    fail(what, nullptr, false);
     return;
   }
 
@@ -323,7 +328,7 @@ void setup()
 
   if (network_error != nullptr)
   {
-    fail(network_error, detail, SLEEP_MINUTES);
+    fail(network_error, detail, true);
     return;
   }
 
@@ -331,8 +336,6 @@ void setup()
 
   ArtfeedConfig cfg = artfeed_default_config();
   cfg.base_url = ART_BASE_URL;
-  cfg.sequential = CYCLE_ALL_IMAGES;
-  cfg.avoid_recent = AVOID_RECENT;
   cfg.on_stage = on_artfeed_stage;
 
   char name[128];
@@ -341,7 +344,7 @@ void setup()
   {
     wifi_reset();
     artfeed_detail(detail, sizeof(detail));
-    fail("Could not load the image list", detail, SLEEP_MINUTES);
+    fail("Could not load the image list", detail, true);
     return;
   }
 
@@ -352,7 +355,7 @@ void setup()
 
   /* Optional one-line caption, painted over the top of the frame as it
    * streams. Uses the at-rest battery reading from before WiFi came up. */
-  status_line_begin(position, count, battery_ok ? &battery : nullptr);
+  status_line_begin(position, count, name, battery_ok ? &battery : nullptr);
 
   /* Streams, then drops the radio before the refresh. On failure the panel
    * keeps the image it already had. */
@@ -364,7 +367,7 @@ void setup()
   {
     wifi_reset();
     artfeed_detail(detail, sizeof(detail));
-    fail("Could not download the image", detail, SLEEP_MINUTES);
+    fail("Could not download the image", detail, true);
     return;
   }
 
@@ -372,12 +375,10 @@ void setup()
   {
     /* The frame arrived but the panel would not refresh, so it would not take
      * the error screen either. Try the whole cycle again soon. */
-    status_led(STATUS_ERROR);
     sleep_for_minutes(RETRY_MINUTES, "The panel did not refresh");
     return;
   }
 
-  status_led(STATUS_DONE);
   battery_log();
   Log.notice("Showing \"%s\"" CR, name);
 
@@ -389,7 +390,7 @@ void setup()
                       "Image painted");
   }
   else
-    sleep_for_minutes(SLEEP_MINUTES, "Image painted");
+    sleep_until_next_cycle("Image painted");
 }
 
 void loop()

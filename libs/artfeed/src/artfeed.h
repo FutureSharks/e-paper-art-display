@@ -4,9 +4,8 @@
  *
  * The frames are static files on a web host - in this project, in the repo
  * itself served through raw.githubusercontent.com. A manifest lists what is
- * available; the device takes the next one in order (or one at random) and
- * streams it into the controllers without ever holding the 960 KB frame in
- * memory.
+ * available; the device takes the next one in order and streams it into the
+ * controllers without ever holding the 960 KB frame in memory.
  *
  * Bringing up WiFi and the clock is the caller's job - see src/setup_wifi.h
  * and src/setup_time.h. Nothing reaches the panel until the refresh, so a
@@ -32,15 +31,6 @@ struct ArtfeedConfig
      * is expected at <base_url>manifest.txt. */
     const char *base_url;
 
-    /* Walk the manifest in order instead of picking at random, resuming where
-     * the last wake left off. avoid_recent is ignored in this mode. The
-     * position is kept in NVS, so it survives deep sleep and power loss. */
-    bool sequential;
-
-    /* How many recently shown images to avoid repeating in random mode. Also
-     * kept in NVS. 0 disables the check. */
-    uint8_t avoid_recent;
-
     /* Skip TLS certificate validation. Convenient while bringing the network
      * path up; leave false in a real build. */
     bool insecure;
@@ -58,8 +48,9 @@ struct ArtfeedConfig
  * has no default and must be set. */
 ArtfeedConfig artfeed_default_config();
 
-/* Fetch the manifest and choose an image - the next one in order if
- * cfg.sequential, otherwise at random avoiding recent repeats. The chosen name
+/* Fetch the manifest and choose the next image in order, resuming where the
+ * last wake left off. The position is kept in NVS, so it survives deep sleep
+ * and power loss. The chosen name
  * is written to `name`, and if given, its 1-based position in the manifest and
  * the number of entries to `position` and `count`. Returns false if the
  * manifest could not be read or is empty. */

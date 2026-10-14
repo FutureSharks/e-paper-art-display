@@ -303,13 +303,3 @@ func errorDiffuse(img *Image, pal *matchPalette, kernel []kernelTap, serpentine 
 	}
 	return indices
 }
-
-// render paints palette indices back into an image, for previewing.
-func render(indices []uint8, w, h int, colors []RGB) *Image {
-	out := NewImage(w, h)
-	for i, idx := range indices {
-		c := colors[idx]
-		out.Pix[i*3], out.Pix[i*3+1], out.Pix[i*3+2] = c[0], c[1], c[2]
-	}
-	return out
-}

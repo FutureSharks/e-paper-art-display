@@ -19,16 +19,22 @@ static void append(char *text, size_t len, const char *item)
   snprintf(text + used, len - used, "%s%s", used > 0 ? "  |  " : "", item);
 }
 
-void status_line_begin(uint32_t position, uint32_t count, const BatteryStatus *battery)
+void status_line_begin(uint32_t position, uint32_t count, const char *name,
+                       const BatteryStatus *battery)
 {
   status_line_end();
 
-  char text[96] = "";
+  /* Room for every item, with a manifest name of up to 128 bytes. */
+  char text[224] = "";
   char item[32];
 
 #if SHOW_IMAGE_INDEX
   snprintf(item, sizeof(item), "Image %u/%u", (unsigned)position, (unsigned)count);
   append(text, sizeof(text), item);
+#endif
+
+#if SHOW_FILE_NAME
+  append(text, sizeof(text), name);
 #endif
 
 #if SHOW_BATTERY_PERCENTAGE

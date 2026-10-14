@@ -13,20 +13,21 @@
 #define ART_BASE_URL "https://raw.githubusercontent.com/FutureSharks/e-paper-art-display/main/artwork/processed/"
 
 // ===== Display Cycle =====
-#define CYCLE_ALL_IMAGES true // Step through the manifest in order; false = picks at random
-#define AVOID_RECENT 8        // In random mode, how many recent images not to repeat
 // Choose one schedule: a fixed local time each day, or a fixed interval.
-#define DISPLAY_UPDATE_TIME "05:00" // Refresh once a day at this local time, 24 h "HH:MM".
+#define DISPLAY_UPDATE_TIME "" // Refresh once a day at this local time, 24 h "HH:MM".
                                     // Set to "" to refresh every SLEEP_MINUTES instead
-#define SLEEP_MINUTES 5       // Sleep between image refresh when DISPLAY_UPDATE_TIME is "".
-                              // Also the wait before retrying a failed WiFi, NTP or download
-#define RETRY_MINUTES 1       // Sleep after the panel fails to refresh, before trying again
-#define DEEP_SLEEP true      // Deep sleep between images. false stays awake and restarts instead; set to true unless debugging
+#define SLEEP_MINUTES 30      // Sleep between image refresh when DISPLAY_UPDATE_TIME is "".
+                              // Also the wait before retrying a failed WiFi, NTP or download.
+                              // 0 = never sleep: pause 5 s, then straight on to the next image,
+                              // ignoring DISPLAY_UPDATE_TIME
+#define RETRY_MINUTES 10      // Sleep after the panel fails to refresh, before trying again
+#define DEEP_SLEEP true       // Deep sleep between images. false stays awake and restarts instead; set to true unless debugging
 
 // ===== On-screen Status Line =====
 // One line of small text in the top-left corner of the image.
 #define SHOW_BATTERY_PERCENTAGE true // Battery level, e.g. "Battery 87%"
-#define SHOW_IMAGE_INDEX true        // Which image is displayed, e.g. "Image 3/14"
+#define SHOW_IMAGE_INDEX false        // Which image is displayed, e.g. "Image 3/14"
+#define SHOW_FILE_NAME true         // The displayed file's name, e.g. "0vcc_155_hilma-af-klint_portrait.bin"
 #define SHOW_REFRESH_TIME true       // When the image was drawn, e.g. "28 Sep 14:05"
 
 // ===== Battery Configuration =====
@@ -40,7 +41,7 @@
 #define NTP_SERVER "pool.ntp.org" // SNTP server
 
 // ===== Logging Configuration =====
-#define DEBUG_MODE false // Verbose logging and the status LED
+#define DEBUG_MODE false // Verbose logging
 
 #if DEBUG_MODE
 #define LOG_LEVEL LOG_LEVEL_VERBOSE

@@ -75,6 +75,7 @@ tools/imgproc/imgproc
 
 # imgproc previews: the dithered result written next to each source image
 *.preview.jpg
+*.preview.png
 
 # Source artwork. The packed frames in artwork/processed/ are committed - the
 # device fetches those over raw.githubusercontent.com - but the originals are

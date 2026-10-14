@@ -11,18 +11,24 @@ This tool converts source images into the exact byte stream the firmware pushes 
 Run it from the repository root; the default input and output paths are relative to it.
 
 ```sh
-go run ./tools/imgproc                    # images/art/*.jpg -> images/art/processed/
+go run ./tools/imgproc                    # artwork/*.jpg -> artwork/processed/
 go run ./tools/imgproc -preset restore    # faded scans and paintings
 go run ./tools/imgproc -preset posterscan # warm paper, strong flat colour
 go run ./tools/imgproc -list-presets      # also -list-palettes, -list-kernels
 ```
 
-Alongside each source image it writes `<name>.preview.jpg`: the dithered result
-at the source's own resolution, in the palette's calibrated colours, so the two
-can be flipped between in any viewer to see what the panel will make of it.
-Previews are build output and are gitignored. `-preview-source panel` writes the
-actual cropped 1200x1600 frame instead, which is the honest check - the default
-full-resolution preview dithers at a finer pitch than the panel has.
+Alongside each source image it writes `<name>.preview.png`: the exact cropped
+1200x1600 frame the panel will show, in the palette's calibrated colours, so you
+can see what the panel will make of it before flashing anything. Previews are
+build output and are gitignored. `-preview-source full` instead dithers the whole
+uncropped image at its own resolution, which is easier to flip against the
+original but dithers at a finer pitch than the panel has.
+
+Previews are lossless paletted PNGs rather than JPEGs: a six-colour dither is
+the worst case for JPEG, whose chroma subsampling and ringing blur exactly the
+dot pattern you are trying to judge. With only six colours the PNG is stored at
+4 bits per pixel, so it is also small. Any `.preview.jpg` left by an older
+version is removed when its PNG is written.
 
 The `.bin` files are always the cropped panel frame, 960,000 bytes each.
 
@@ -30,12 +36,16 @@ Settings that affect the packed output are recorded in `manifest.txt`, so
 changing a flag repacks everything; otherwise only images newer than their
 output are redone.
 
+Deleting a source image deletes its `.bin` from the output directory on the
+next run, so it drops out of the manifest and the device's rotation. Only `.bin`
+files are removed; anything else in the output directory is left alone.
+
 `-random-prefix` (off by default) names each frame `xxxx_name.bin`, where `xxxx`
 is four random lowercase letters/digits. The manifest is sorted by name, so the
-device's `CYCLE_ALL_IMAGES=true` sequential mode then steps through the images
-in a shuffled order. Prefixes are kept between runs so packing stays
-incremental; `-force` re-rolls them for a new order. Toggling the flag renames
-existing frames rather than repacking them.
+device, which steps through it in order, shows the images in a shuffled order.
+Prefixes are kept between runs so packing stays incremental; `-force` re-rolls
+them for a new order. Toggling the flag renames existing frames rather than
+repacking them.
 
 ### Why the tone presets matter
 

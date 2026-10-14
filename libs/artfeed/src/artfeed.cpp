@@ -81,8 +81,6 @@ ArtfeedConfig artfeed_default_config()
      * compiled out of tree and cannot see it. The sketch overrides these. */
     ArtfeedConfig cfg = {};
     cfg.base_url = nullptr;
-    cfg.sequential = true;
-    cfg.avoid_recent = 8;
     cfg.insecure = false;
     cfg.http_timeout_ms = 20000;
     cfg.on_stage = nullptr;
@@ -160,33 +158,6 @@ static void artfeed_report_failure(NetworkClientSecure &client, HTTPClient &http
         Log.error("  body   %s" CR, body.c_str());
     }
     Log.error("  heap   %u free" CR, (unsigned)ESP.getFreeHeap());
-}
-
-/* Remember the last few choices so the same piece does not come round twice in
- * a row. Stored as a ring in NVS. */
-static bool artfeed_recently_shown(Preferences &prefs, uint8_t depth, const char *name)
-{
-    char key[16];
-    for (uint8_t i = 0; i < depth; i++)
-    {
-        snprintf(key, sizeof(key), "r%u", (unsigned)i);
-        String seen = prefs.getString(key, "");
-        if (seen.length() > 0 && seen.equals(name))
-            return true;
-    }
-    return false;
-}
-
-static void artfeed_remember(Preferences &prefs, uint8_t depth, const char *name)
-{
-    if (depth == 0)
-        return;
-
-    uint8_t head = prefs.getUChar("head", 0) % depth;
-    char key[16];
-    snprintf(key, sizeof(key), "r%u", (unsigned)head);
-    prefs.putString(key, name);
-    prefs.putUChar("head", (uint8_t)((head + 1) % depth));
 }
 
 static inline void report(const ArtfeedConfig &cfg, ArtfeedStage stage)
@@ -269,44 +240,15 @@ bool artfeed_pick(const ArtfeedConfig &cfg, char *name, size_t name_len, uint32_
     }
     Log.notice("Manifest lists %u image(s)" CR, (unsigned)count);
 
+    /* Resume where the last wake left off. Taken modulo the current count so
+     * the position stays valid when images are added or removed. */
     Preferences prefs;
     prefs.begin("artfeed", false);
-
-    size_t chosen = 0;
-    uint8_t depth = 0;
-
-    if (cfg.sequential)
-    {
-        /* Resume where the last wake left off. Taken modulo the current count
-         * so the position stays valid when images are added or removed. */
-        uint32_t pos = prefs.getUInt("seq", 0) % count;
-        chosen = (size_t)pos;
-        prefs.putUInt("seq", (uint32_t)((pos + 1) % count));
-    }
-    else
-    {
-        /* esp_random() is a real hardware RNG, so no seeding needed. Try a
-         * handful of times to dodge a recent repeat, then accept whatever we
-         * have - with fewer images than the avoid depth, every choice is a
-         * repeat. */
-        depth = cfg.avoid_recent;
-        if (depth >= count)
-            depth = (count > 1) ? (uint8_t)(count - 1) : 0;
-
-        for (int attempt = 0; attempt < 12; attempt++)
-        {
-            chosen = (size_t)(esp_random() % count);
-            String candidate =
-                body.substring(starts[chosen], starts[chosen] + lengths[chosen]);
-            if (depth == 0 || !artfeed_recently_shown(prefs, depth, candidate.c_str()))
-                break;
-        }
-    }
+    const size_t chosen = prefs.getUInt("seq", 0) % count;
+    prefs.putUInt("seq", (uint32_t)((chosen + 1) % count));
+    prefs.end();
 
     String pick = body.substring(starts[chosen], starts[chosen] + lengths[chosen]);
-    if (!cfg.sequential)
-        artfeed_remember(prefs, depth, pick.c_str());
-    prefs.end();
 
     if (pick.length() + 1 > name_len)
     {
@@ -318,8 +260,8 @@ bool artfeed_pick(const ArtfeedConfig &cfg, char *name, size_t name_len, uint32_
     strncpy(name, pick.c_str(), name_len - 1);
     name[name_len - 1] = '\0';
 
-    Log.notice("Chose \"%s\" (%u of %u, %s)" CR, name, (unsigned)(chosen + 1),
-               (unsigned)count, cfg.sequential ? "in order" : "random");
+    Log.notice("Chose \"%s\" (%u of %u)" CR, name, (unsigned)(chosen + 1),
+               (unsigned)count);
 
     if (position != nullptr)
         *position = (uint32_t)(chosen + 1);

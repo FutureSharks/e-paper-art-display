@@ -21,12 +21,15 @@
 //	go run ./tools/imgproc -preset restore        # rescue faded scans and paintings
 //	go run ./tools/imgproc -preset posterscan     # warm paper, strong flat colour
 //	go run ./tools/imgproc -fit contain           # letterbox instead of cropping
-//	go run ./tools/imgproc -random-prefix         # shuffle the manifest order (see CYCLE_ALL_IMAGES)
+//	go run ./tools/imgproc -random-prefix         # shuffle the manifest order the device steps through
 //	go run ./tools/imgproc -list-presets          # and -list-palettes, -list-kernels
 //
-// Alongside each source image it writes a JPEG preview of the dithered result
-// at the source's own resolution, so the two can be flipped between in any
-// image viewer. Previews are build output and are gitignored.
+// Alongside each source image it writes a PNG preview of the dithered result:
+// by default the exact cropped 1200x1600 frame the panel will show, painted in
+// the calibrated ink colours. PNG rather than JPEG because a six-colour dither
+// is the worst case for JPEG - chroma subsampling and ringing smear the dots
+// the preview exists to show - and as a 4-bit paletted PNG it is lossless and
+// still small. Previews are build output and are gitignored.
 //
 // Output format, per .bin file (960,000 bytes):
 //
@@ -41,8 +44,9 @@ import (
 	"flag"
 	"fmt"
 	"image"
-	"image/jpeg"
-	_ "image/png"
+	"image/color"
+	_ "image/jpeg"
+	"image/png"
 	"math"
 	"math/rand"
 	"os"
@@ -62,10 +66,14 @@ const (
 	streamBytes = halfBytes * 2
 )
 
-// previewSuffix replaces the source's extension, so images/art/foo.jpg gets
-// images/art/foo.preview.jpg. findSources skips anything matching it, or the
-// next run would treat previews as new source images.
-const previewSuffix = ".preview.jpg"
+// previewSuffix replaces the source's extension, so artwork/foo.jpg gets
+// artwork/foo.preview.png. findSources skips anything matching it, or the
+// next run would treat previews as new source images. legacyPreviewSuffix is
+// what earlier versions wrote; it is removed when a new preview is written.
+const (
+	previewSuffix       = ".preview.png"
+	legacyPreviewSuffix = ".preview.jpg"
+)
 
 type config struct {
 	palette       [6]PaletteEntry
@@ -82,7 +90,6 @@ type config struct {
 	serpentine    bool
 	writePreview  bool
 	previewSource string
-	previewQual   int
 }
 
 // fingerprint is every setting that changes the packed stream. It is recorded
@@ -114,12 +121,11 @@ func main() {
 	serpentine := flag.Bool("serpentine", true,
 		"reverse alternate rows while diffusing, which suppresses worming")
 	writePreview := flag.Bool("preview", true,
-		"write a JPEG of the result next to each source image")
-	previewSource := flag.String("preview-source", "full",
-		"full (whole image at its own resolution) or panel (the 1200x1600 frame)")
+		"write a PNG of the result next to each source image")
+	previewSource := flag.String("preview-source", "panel",
+		"panel (the cropped 1200x1600 frame the device shows) or full (whole image at its own resolution)")
 	previewColors := flag.String("preview-colors", "calibrated",
 		"calibrated (how the panel will look) or device (the raw primaries)")
-	previewQual := flag.Int("preview-quality", 92, "JPEG quality for previews")
 	force := flag.Bool("force", false,
 		"repack images whose output is already up to date (and re-roll -random-prefix)")
 	randomPrefix := flag.Bool("random-prefix", false,
@@ -152,7 +158,7 @@ func main() {
 	}
 
 	cfg, err := buildConfig(*paletteName, *presetName, *fit, *kernelName, *matchMode,
-		*previewSource, *previewColors, *saturation, *previewQual, *serpentine, *writePreview)
+		*previewSource, *previewColors, *saturation, *serpentine, *writePreview)
 	if err != nil {
 		fatalf("%v", err)
 	}
@@ -186,8 +192,12 @@ func main() {
 	}
 
 	var packed []string
+	// Every frame name a current source owns, packed or not, so that a source
+	// which fails this run keeps its previous frame rather than losing it.
+	keep := make(map[string]bool, len(sources))
 	for _, src := range sources {
 		name := outputName(*out, sourceStem(src), stems, *randomPrefix, repackAll)
+		keep[name] = true
 		dst := filepath.Join(*out, name)
 		previewPath := previewPathFor(src)
 
@@ -215,11 +225,42 @@ func main() {
 	if err := writeManifest(manifest, packed, fingerprint); err != nil {
 		fatalf("writing %s: %v", manifest, err)
 	}
+	removed, err := pruneFrames(*out, keep)
+	if err != nil {
+		fatalf("pruning %s: %v", *out, err)
+	}
+	for _, n := range removed {
+		fmt.Printf("  %-44s removed, source is gone\n", n)
+	}
+
 	fmt.Printf("\n%d image(s), %s\n", len(packed), manifest)
 }
 
+// pruneFrames deletes every .bin in outDir that no current source owns, so
+// removing an image from the source directory removes it from the device's
+// rotation on the next run. Only .bin files are touched; the manifest is
+// rewritten separately and anything else in the directory is left alone.
+func pruneFrames(outDir string, keep map[string]bool) ([]string, error) {
+	entries, err := os.ReadDir(outDir)
+	if err != nil {
+		return nil, err
+	}
+	var removed []string
+	for _, e := range entries {
+		n := e.Name()
+		if e.IsDir() || !strings.HasSuffix(n, ".bin") || keep[n] {
+			continue
+		}
+		if err := os.Remove(filepath.Join(outDir, n)); err != nil {
+			return removed, err
+		}
+		removed = append(removed, n)
+	}
+	return removed, nil
+}
+
 func buildConfig(paletteName, presetName, fit, kernelName, matchMode,
-	previewSource, previewColors string, saturation float64, previewQual int,
+	previewSource, previewColors string, saturation float64,
 	serpentine, writePreview bool) (config, error) {
 
 	var cfg config
@@ -235,9 +276,6 @@ func buildConfig(paletteName, presetName, fit, kernelName, matchMode,
 	}
 	if previewColors != "calibrated" && previewColors != "device" {
 		return cfg, fmt.Errorf("-preview-colors must be calibrated or device, got %q", previewColors)
-	}
-	if previewQual < 1 || previewQual > 100 {
-		return cfg, fmt.Errorf("-preview-quality must be between 1 and 100, got %d", previewQual)
 	}
 
 	entries, err := lookupPalette(paletteName)
@@ -279,7 +317,6 @@ func buildConfig(paletteName, presetName, fit, kernelName, matchMode,
 		serpentine:    serpentine,
 		writePreview:  writePreview,
 		previewSource: previewSource,
-		previewQual:   previewQual,
 	}
 
 	// The preview is normally painted in the calibrated colours, because those
@@ -376,6 +413,10 @@ func previewPathFor(src string) string {
 	return strings.TrimSuffix(src, filepath.Ext(src)) + previewSuffix
 }
 
+func legacyPreviewPathFor(src string) string {
+	return strings.TrimSuffix(src, filepath.Ext(src)) + legacyPreviewSuffix
+}
+
 func findSources(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -463,7 +504,12 @@ func process(src, dst, previewPath string, cfg config) error {
 		previewIndices = errorDiffuse(full, pal, cfg.kernel, cfg.serpentine)
 	}
 
-	return writeJPEG(previewPath, render(previewIndices, w, h, cfg.preview[:]), cfg.previewQual)
+	if err := writePNG(previewPath, previewIndices, w, h, cfg.preview[:]); err != nil {
+		return err
+	}
+	// Superseded by the PNG; leaving it would show a stale result next to it.
+	os.Remove(legacyPreviewPathFor(src))
+	return nil
 }
 
 // toImage copies a decoded image into the byte buffer the stages work on.
@@ -574,14 +620,15 @@ func writeFrame(dst string, indices []uint8) error {
 	return os.WriteFile(dst, buf, 0o644)
 }
 
-func writeJPEG(path string, img *Image, quality int) error {
-	nrgba := image.NewNRGBA(image.Rect(0, 0, img.W, img.H))
-	for i, n := 0, img.W*img.H; i < n; i++ {
-		nrgba.Pix[i*4] = img.Pix[i*3]
-		nrgba.Pix[i*4+1] = img.Pix[i*3+1]
-		nrgba.Pix[i*4+2] = img.Pix[i*3+2]
-		nrgba.Pix[i*4+3] = 255
+// writePNG stores the palette indices directly as a paletted PNG. With six
+// entries the encoder packs four bits per pixel, so a lossless preview of the
+// panel frame comes out smaller than a decent-quality JPEG of it.
+func writePNG(path string, indices []uint8, w, h int, colors []RGB) error {
+	pal := make(color.Palette, len(colors))
+	for i, c := range colors {
+		pal[i] = color.RGBA{c[0], c[1], c[2], 255}
 	}
+	img := &image.Paletted{Pix: indices, Stride: w, Rect: image.Rect(0, 0, w, h), Palette: pal}
 
 	f, err := os.Create(path)
 	if err != nil {
@@ -589,11 +636,11 @@ func writeJPEG(path string, img *Image, quality int) error {
 	}
 	defer f.Close()
 
-	w := bufio.NewWriter(f)
-	if err := jpeg.Encode(w, nrgba, &jpeg.Options{Quality: quality}); err != nil {
+	bw := bufio.NewWriter(f)
+	if err := png.Encode(bw, img); err != nil {
 		return err
 	}
-	if err := w.Flush(); err != nil {
+	if err := bw.Flush(); err != nil {
 		return err
 	}
 	return f.Close()
