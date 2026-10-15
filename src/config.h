@@ -6,11 +6,7 @@
 // The local timezone is set by the POSIX TZ rule in src/setup_time.cpp,
 // not here - change it there.
 
-// ===== Artwork Source =====
-// Packed frames are served as static files. Anything reachable over HTTPS
-// works; this points at the repo itself. The trailing slash matters, and
-// manifest.txt is expected alongside the images.
-#define ART_BASE_URL "https://raw.githubusercontent.com/FutureSharks/e-paper-art-display/main/artwork/processed/"
+// The artwork source, ART_BASE_URL, is set in src/secrets.h.
 
 // ===== Display Cycle =====
 // Choose one schedule: a fixed local time each day, or a fixed interval.
@@ -25,10 +21,10 @@
 
 // ===== On-screen Status Line =====
 // One line of small text in the top-left corner of the image.
-#define SHOW_BATTERY_PERCENTAGE true // Battery level, e.g. "Battery 87%"
+#define SHOW_BATTERY_PERCENTAGE true  // Battery level, e.g. "Battery 87%"
 #define SHOW_IMAGE_INDEX false        // Which image is displayed, e.g. "Image 3/14"
-#define SHOW_FILE_NAME true         // The displayed file's name, e.g. "0vcc_155_hilma-af-klint_portrait.bin"
-#define SHOW_REFRESH_TIME true       // When the image was drawn, e.g. "28 Sep 14:05"
+#define SHOW_FILE_NAME true           // The displayed file's name, e.g. "0vcc_155_hilma-af-klint_portrait.bin"
+#define SHOW_REFRESH_TIME true        // When the image was drawn, e.g. "28 Sep 14:05"
 
 // ===== Battery Configuration =====
 // MAX17048 fuel gauge on I2C at 0x36. A refresh takes ~35 s and drives the

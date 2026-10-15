@@ -81,6 +81,7 @@ ArtfeedConfig artfeed_default_config()
      * compiled out of tree and cannot see it. The sketch overrides these. */
     ArtfeedConfig cfg = {};
     cfg.base_url = nullptr;
+    cfg.auth_token = nullptr;
     cfg.insecure = false;
     cfg.http_timeout_ms = 20000;
     cfg.on_stage = nullptr;
@@ -96,10 +97,18 @@ uint32_t artfeed_next_index()
     return pos;
 }
 
+static bool has_token(const ArtfeedConfig &cfg)
+{
+    return cfg.auth_token != nullptr && cfg.auth_token[0] != '\0';
+}
+
 /* Shared setup for both requests. The caller owns both objects. */
 static void artfeed_prepare(const ArtfeedConfig &cfg, NetworkClientSecure &client,
                             HTTPClient &http)
 {
+    if (has_token(cfg) && cfg.insecure)
+        Log.warning("Sending the access token without checking the certificate" CR);
+
     if (cfg.insecure)
     {
         client.setInsecure();
@@ -112,7 +121,28 @@ static void artfeed_prepare(const ArtfeedConfig &cfg, NetworkClientSecure &clien
     client.setTimeout(cfg.http_timeout_ms / 1000);
     http.setTimeout(cfg.http_timeout_ms);
     http.setReuse(false);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    /* HTTPClient carries every added header across a redirect, wherever it
+     * points, so with a token a redirect surfaces as an HTTP 30x instead. */
+    http.setFollowRedirects(has_token(cfg) ? HTTPC_DISABLE_FOLLOW_REDIRECTS
+                                           : HTTPC_STRICT_FOLLOW_REDIRECTS);
+}
+
+/* Open a request to `url`, with the token if there is one. HTTPClient::begin()
+ * clears any headers set before it, so the header has to be added after. */
+static bool artfeed_begin(const ArtfeedConfig &cfg, NetworkClientSecure &client,
+                          HTTPClient &http, const String &url)
+{
+    Log.notice("GET %s%s" CR, url.c_str(), has_token(cfg) ? " (with token)" : "");
+    error_begin(url);
+    if (!http.begin(client, url))
+    {
+        Log.error("Cannot parse url %s" CR, url.c_str());
+        error_reason("Not a valid URL");
+        return false;
+    }
+    if (has_token(cfg))
+        http.addHeader("Authorization", String("Bearer ") + cfg.auth_token);
+    return true;
 }
 
 /* Report why a request failed in enough detail to tell the causes apart: a
@@ -120,8 +150,9 @@ static void artfeed_prepare(const ArtfeedConfig &cfg, NetworkClientSecure &clien
  * HTTP status and the server said something worth reading. A 404 body of
  * "404: Not Found" means the file is not on the host - most often because the
  * commit adding it has not been pushed. The short form goes in last_error. */
-static void artfeed_report_failure(NetworkClientSecure &client, HTTPClient &http,
-                                   const char *what, const char *url, int code)
+static void artfeed_report_failure(const ArtfeedConfig &cfg, NetworkClientSecure &client,
+                                   HTTPClient &http, const char *what, const char *url,
+                                   int code)
 {
     const String code_text = http.errorToString(code);
     Log.error("%s failed" CR, what);
@@ -149,7 +180,11 @@ static void artfeed_report_failure(NetworkClientSecure &client, HTTPClient &http
     }
     else
     {
-        error_reason("HTTP %d%s", code, http_reason(code));
+        /* GitHub hides a private repo from a bad, expired or under-scoped
+         * token behind a 404, not a 401, so a token makes any of them suspect. */
+        const bool token_suspect = has_token(cfg) && (code == 401 || code == 403 || code == 404);
+        error_reason("HTTP %d%s%s", code, http_reason(code),
+                     token_suspect ? " - check the access token" : "");
         Log.error("  length %d" CR, http.getSize());
         String body = http.getString();
         if (body.length() > 160)
@@ -177,20 +212,14 @@ bool artfeed_pick(const ArtfeedConfig &cfg, char *name, size_t name_len, uint32_
     HTTPClient http;
     artfeed_prepare(cfg, client, http);
 
-    Log.notice("GET %s" CR, url.c_str());
-    error_begin(url);
-    if (!http.begin(client, url))
-    {
-        Log.error("Cannot parse url %s" CR, url.c_str());
-        error_reason("Not a valid URL");
+    if (!artfeed_begin(cfg, client, http, url))
         return false;
-    }
 
     uint32_t t0 = millis();
     int code = http.GET();
     if (code != HTTP_CODE_OK)
     {
-        artfeed_report_failure(client, http, "manifest GET", url.c_str(), code);
+        artfeed_report_failure(cfg, client, http, "manifest GET", url.c_str(), code);
         http.end();
         return false;
     }
@@ -286,19 +315,13 @@ bool artfeed_show(const ArtfeedConfig &cfg, const char *name)
     HTTPClient http;
     artfeed_prepare(cfg, client, http);
 
-    Log.notice("GET %s" CR, url.c_str());
-    error_begin(url);
-    if (!http.begin(client, url))
-    {
-        Log.error("Cannot parse url %s" CR, url.c_str());
-        error_reason("Not a valid URL");
+    if (!artfeed_begin(cfg, client, http, url))
         return false;
-    }
 
     int code = http.GET();
     if (code != HTTP_CODE_OK)
     {
-        artfeed_report_failure(client, http, "image GET", url.c_str(), code);
+        artfeed_report_failure(cfg, client, http, "image GET", url.c_str(), code);
         http.end();
         return false;
     }

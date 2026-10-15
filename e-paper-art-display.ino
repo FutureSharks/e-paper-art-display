@@ -29,6 +29,15 @@
 #include "src/setup_wifi.h"
 #include "src/status_line.h"
 
+#ifndef ART_BASE_URL
+#error "ART_BASE_URL is not set: copy it from src/secrets_template.h into src/secrets.h"
+#endif
+
+/* A secrets.h made before ART_AUTH_TOKEN existed: no token, public artwork. */
+#ifndef ART_AUTH_TOKEN
+#define ART_AUTH_TOKEN ""
+#endif
+
 static const uint64_t US_PER_SECOND = 1000000ULL;
 static const uint32_t MS_PER_SECOND = 1000UL;
 static const uint32_t SECONDS_PER_MINUTE = 60;
@@ -336,6 +345,7 @@ void setup()
 
   ArtfeedConfig cfg = artfeed_default_config();
   cfg.base_url = ART_BASE_URL;
+  cfg.auth_token = ART_AUTH_TOKEN;
   cfg.on_stage = on_artfeed_stage;
 
   char name[128];

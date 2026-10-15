@@ -4,7 +4,7 @@ A battery-powered, e-paper daily art display.
 
 ![complete-1](images/IMG_2637.jpeg)
 
-An ESP32 microcontroller wakes on a schedule, connects to Wi-Fi, downloads a piece of art and shows it on a 13.3" color e-paper panel. The artwork image is preprocessed locally using [tools/imgproc](tools/imgproc), then pushed to GitHub where it is downloaded from by the microcontroller. Because the panel holds the image with no power consumption, the battery is only used while the image is changing, so battery life can be months or even years with a daily image refresh.
+An ESP32 microcontroller wakes on a schedule, connects to Wi-Fi, downloads a piece of art and shows it on a 13.3" color e-paper panel. The artwork image is preprocessed locally using [tools/imgproc](tools/imgproc), then pushed to GitHub or any static content serving host. Because the panel holds the image with no power consumption, the battery is only used while the image is changing, so battery life can be months or even years with a daily image refresh.
 
 ## Hardware
 
@@ -60,12 +60,12 @@ Notes:
 To build your own:
 
 1. Copy the template: `cp src/secrets_template.h src/secrets.h`
-2. Edit `src/secrets.h` with your own values for `WIFI_SSID` and `WIFI_PASSWORD`
+2. Edit `src/secrets.h` with your own values for `WIFI_SSID` and `WIFI_PASSWORD`. If you fork this repo, also change `ART_BASE_URL`
+   1. To keep your artwork in a private GitHub repo, point `ART_BASE_URL` at it and set `ART_AUTH_TOKEN` to a fine-grained personal access token with read-only **Contents** access to just that repo. Any other host that accepts a bearer token works the same way. See the comments in [src/secrets_template.h](src/secrets_template.h).
 3. Install the [Arduino CLI](https://arduino.github.io/arduino-cli/latest/installation)
 4. Run `arduino-cli compile` from the root of this repo; the provided [sketch.yaml](sketch.yaml) supplies the board and build settings
 5. Review [src/config.h](src/config.h) and adjust it as needed:
    1. By default the frame refreshes once a day at 05:00 local time. You can change this; the comments in the file explain how.
-   2. If you fork this repo, you will need to change `ART_BASE_URL`
 6. To upload, run `arduino-cli upload --port <your port device>`
 
 ### Adding artwork

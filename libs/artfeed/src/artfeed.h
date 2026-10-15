@@ -31,6 +31,12 @@ struct ArtfeedConfig
      * is expected at <base_url>manifest.txt. */
     const char *base_url;
 
+    /* Optional access token, sent as "Authorization: Bearer <token>" on every
+     * request - a GitHub personal access token lets the frames live in a
+     * private repo. Null or empty sends no header. Redirects are not followed
+     * while a token is set, so it never reaches another host. */
+    const char *auth_token;
+
     /* Skip TLS certificate validation. Convenient while bringing the network
      * path up; leave false in a real build. */
     bool insecure;
