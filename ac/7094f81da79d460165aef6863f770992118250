@@ -1,0 +1,45 @@
+libs/artfeed/src/artfeed.h
+  s_cda6d5bcdb956d::t_0885b32075a91a 34-39
+src/secrets_template.h
+  s_cda6d5bcdb956d::t_57aa2dc9b2229b 17-25
+  s_cda6d5bcdb956d::t_030af01dcb0276 11,13-16
+  h_61c37ecb9a0034 12,26
+README.md
+  s_cda6d5bcdb956d::t_c114d116516ba5 64
+  s_cda6d5bcdb956d::t_a47f6685e7d1c5 63
+  h_61c37ecb9a0034 7
+libs/artfeed/src/artfeed.cpp
+  s_cda6d5bcdb956d::t_5e1c3c3d359a13 100-104,109-111
+  s_cda6d5bcdb956d::t_4c3f7027c3a2d1 84
+  s_cda6d5bcdb956d::t_17c48a42d675c3 215,318
+  s_cda6d5bcdb956d::t_0cd10681d01c9a 153-155,183-187,222,324
+  s_cda6d5bcdb956d::t_7fbc817c37fa69 124-145
+e-paper-art-display.ino
+  s_cda6d5bcdb956d::t_c114d116516ba5 36-38,348
+  s_cda6d5bcdb956d::t_cd7669e3103b9d 39-40
+  s_cda6d5bcdb956d::t_21eca582e7bd48 32-35
+src/config.h
+  s_cda6d5bcdb956d::t_5e01f1c2ec568c 9
+  h_61c37ecb9a0034 26-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "ac7094f81da79d460165aef6863f770992118250",
+  "prompts": {},
+  "humans": {
+    "h_61c37ecb9a0034": {
+      "author": "Max Williams <futuresharks@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_cda6d5bcdb956d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8dd326ae-2f5b-4647-8049-f59b5c14169b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Max Williams <futuresharks@gmail.com>"
+    }
+  }
+}
