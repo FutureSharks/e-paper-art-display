@@ -1,0 +1,16 @@
+src/config.h
+  h_61c37ecb9a0034 27,29-30
+README.md
+  h_61c37ecb9a0034 5,7,19-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "93ce251b4997adeb5684da8cb39c4deacf6194db",
+  "prompts": {},
+  "humans": {
+    "h_61c37ecb9a0034": {
+      "author": "Max Williams <futuresharks@gmail.com>"
+    }
+  }
+}
