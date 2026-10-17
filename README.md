@@ -2,7 +2,9 @@
 
 A battery-powered, e-paper daily art display.
 
-![complete-1](images/IMG_2637.jpeg)
+![complete-1](images/IMG_2676.JPG)
+
+![complete-2](images/IMG_2677.JPG)
 
 An ESP32 microcontroller wakes on a schedule, connects to Wi-Fi, downloads a piece of art and shows it on a 13.3" color e-paper panel. The artwork image is preprocessed locally using [tools/imgproc](tools/imgproc), then pushed to GitHub or any static content serving host. Because the panel holds the image with no power consumption, the battery is only used while the image is changing, so battery life can be months or even years with a daily image refresh.
 
@@ -13,6 +15,8 @@ An [Adafruit Feather ESP32-C6](https://learn.adafruit.com/adafruit-esp32-c6-feat
 The whole build is powered by a single-cell LiPo plugged into the Feather's JST connector. The Feather charges the cell over USB-C and reports its level through its onboard MAX17048 fuel gauge, and its 3V3 regulator supplies the panel as well as the ESP32.
 
 The Inky Impression is actually a Raspberry Pi HAT with a 40-pin header, so the Feather is connected to it via a proto PCB. See [Pin map](#pin-map) below.
+
+There's some more images in [images](images) videos [here](https://www.instagram.com/p/Deme-O6MILT/) and [here](https://www.instagram.com/p/DeClOizh1BX/).
 
 ### Pin map
 
