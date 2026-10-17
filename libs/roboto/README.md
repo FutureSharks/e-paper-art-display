@@ -1,7 +1,7 @@
 # Roboto font
 
 Roboto pre-rendered at 10 and 24 pt (at 150 dpi) by epdiy's `fontconvert.py`, taken
-from `other-repos/projets/inky-ical`. The generated `roboto<size>.h` headers
+from [FutureSharks/inky-ical](https://github.com/FutureSharks/inky-ical). The generated `roboto<size>.h` headers
 originally included epdiy's `epd_driver.h`; they now include
 `roboto_types.h`, which reproduces just the font types. The epdiy renderer is
 replaced by `roboto_draw()` in `roboto_font.c`, which needs no framebuffer.

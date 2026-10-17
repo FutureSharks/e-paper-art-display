@@ -17,7 +17,8 @@
 //
 // This file has been modified from the original. Translated from TypeScript
 // to Go, operating on an RGB byte slice rather than a canvas ImageData. The
-// clarity stage and the fast dynamic-range path were not ported.
+// clarity stage, the fast dynamic-range path and level compression were not
+// ported.
 // See NOTICE in this directory for the full list of changes.
 
 // The tone pipeline, ported from paperlesspaper's epdoptimize (Apache-2.0).
@@ -31,11 +32,12 @@
 //
 // Stage order matches epdoptimize's applyImageProcessing:
 //
-//	paper normalisation -> tone mapping -> dynamic range compression -> levels
+//	paper normalisation -> tone mapping -> dynamic range compression
 //
-// Two stages of that library are deliberately not ported: "clarity" (local
-// contrast, marginal for photographs) and the "fast" dynamic-range path, which
-// exists only to keep a browser preview responsive.
+// Three parts of that library are deliberately not ported: "clarity" (local
+// contrast, marginal for photographs), the "fast" dynamic-range path, which
+// exists only to keep a browser preview responsive, and level compression,
+// which none of the presets use.
 package main
 
 import "math"
@@ -50,12 +52,6 @@ type Image struct {
 
 func NewImage(w, h int) *Image {
 	return &Image{W: w, H: h, Pix: make([]uint8, w*h*3)}
-}
-
-func (img *Image) Clone() *Image {
-	out := &Image{W: img.W, H: img.H, Pix: make([]uint8, len(img.Pix))}
-	copy(out.Pix, img.Pix)
-	return out
 }
 
 // f is shorthand for an optional float in the option structs below, where the
@@ -106,19 +102,10 @@ type DynamicRange struct {
 	HighPercentile *float64
 }
 
-type LevelCompression struct {
-	Mode          string // "off" | "perChannel" | "luma"
-	Black         *RGB
-	White         *RGB
-	Auto          bool
-	AutoThreshold *float64
-}
-
 type ImageProcessing struct {
 	PaperNormalization *PaperNormalization
 	ToneMapping        *ToneMapping
 	DynamicRange       *DynamicRange
-	LevelCompression   *LevelCompression
 }
 
 // applyImageProcessing runs every configured stage in order. palette supplies
@@ -126,23 +113,8 @@ type ImageProcessing struct {
 // into, and should be the calibrated colours being dithered against.
 func applyImageProcessing(img *Image, o ImageProcessing, palette []RGB) {
 	applyPaperNormalization(img, o.PaperNormalization)
-
-	// Levels can be folded into the tone-mapping lookup table for free, but
-	// only when nothing between the two stages would change the pixel first.
-	canFuseLevel := normalizeDynamicRange(o.DynamicRange) == nil &&
-		(o.LevelCompression == nil || !o.LevelCompression.Auto)
-
-	if canFuseLevel {
-		applyToneMapping(img, o.ToneMapping, o.LevelCompression)
-	} else {
-		applyToneMapping(img, o.ToneMapping, nil)
-	}
-
+	applyToneMapping(img, o.ToneMapping)
 	applyDynamicRange(img, o.DynamicRange, palette)
-
-	if !canFuseLevel {
-		applyLevelCompression(img, o.LevelCompression)
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -269,31 +241,16 @@ func buildScurveLookup(strength, shadowBoost, highlightBoost, midpoint float64) 
 
 // applyToneMapping applies exposure, saturation and either a contrast scale or
 // an S-curve. Everything except saturation is a per-channel function of the
-// input byte, so it collapses into lookup tables; level compression is folded
-// into the same tables when the caller says it is safe to.
-func applyToneMapping(img *Image, o *ToneMapping, level *LevelCompression) {
-	if o == nil && level == nil {
+// input byte, so it collapses into lookup tables.
+func applyToneMapping(img *Image, o *ToneMapping) {
+	if o == nil {
 		return
 	}
 
-	applyLevel := level != nil &&
-		shouldApplyLevelCompression(img, level) &&
-		!level.Auto &&
-		levelMode(level) == "perChannel"
-
-	var mode string
-	var exposureStops, saturationAdj, contrastAdj, shadowBoost float64
-	var strength, highlightCompress, midpoint *float64
-	if o != nil {
-		mode = o.Mode
-		exposureStops, saturationAdj, contrastAdj = o.Exposure, o.Saturation, o.Contrast
-		shadowBoost = o.ShadowBoost
-		strength, highlightCompress, midpoint = o.Strength, o.HighlightCompress, o.Midpoint
-	}
-
-	exposure := exposureToMultiplier(exposureStops)
-	saturation := linearToMultiplier(saturationAdj)
-	contrast := contrastToMultiplier(contrastAdj)
+	mode := o.Mode
+	exposure := exposureToMultiplier(o.Exposure)
+	saturation := linearToMultiplier(o.Saturation)
+	contrast := contrastToMultiplier(o.Contrast)
 
 	// An unset mode behaves as an S-curve; "contrast" gets the linear scale.
 	defaultStrength := 0.0
@@ -301,12 +258,12 @@ func applyToneMapping(img *Image, o *ToneMapping, level *LevelCompression) {
 		defaultStrength = 0.9
 	}
 	var scurve *[256]uint8
-	if (mode == "" || mode == "scurve") && fv(strength, defaultStrength) != 0 {
+	if (mode == "" || mode == "scurve") && fv(o.Strength, defaultStrength) != 0 {
 		scurve = buildScurveLookup(
-			fv(strength, defaultStrength),
-			shadowBoost,
-			fv(highlightCompress, -1.5),
-			fv(midpoint, 0.5),
+			fv(o.Strength, defaultStrength),
+			o.ShadowBoost,
+			fv(o.HighlightCompress, -1.5),
+			fv(o.Midpoint, 0.5),
 		)
 	}
 
@@ -323,27 +280,6 @@ func applyToneMapping(img *Image, o *ToneMapping, level *LevelCompression) {
 			}
 		}
 		toneLookup[v] = uint8(tone)
-	}
-
-	var levelLookup [3][256]uint8
-	if applyLevel {
-		black := levelRGB(level.Black, 0)
-		white := levelRGB(level.White, 255)
-		var ranges [3]float64
-		for c := 0; c < 3; c++ {
-			ranges[c] = float64(white[c]) - float64(black[c])
-			if ranges[c] <= 0 {
-				applyLevel = false
-			}
-		}
-		if applyLevel {
-			for c := 0; c < 3; c++ {
-				for v := 0; v < 256; v++ {
-					levelLookup[c][v] = clampByte(
-						float64(black[c]) + float64(v)*ranges[c]/255)
-				}
-			}
-		}
 	}
 
 	data := img.Pix
@@ -414,15 +350,7 @@ func applyToneMapping(img *Image, o *ToneMapping, level *LevelCompression) {
 			b = toneLookup[clampByte(bf*255)]
 		}
 
-		if applyLevel {
-			r, g, b = levelLookup[0][r], levelLookup[1][g], levelLookup[2][b]
-		}
 		data[i], data[i+1], data[i+2] = r, g, b
-	}
-
-	// Luma-mode or auto levels could not be folded in above.
-	if level != nil && !applyLevel {
-		applyLevelCompression(img, level)
 	}
 }
 
@@ -501,6 +429,14 @@ func labToRgbWithChromaGuard(source RGB, sourceL, a, b, targetL, amount float64)
 	return protected
 }
 
+// levelRGB resolves an optional endpoint colour to a concrete one.
+func levelRGB(v *RGB, fallback uint8) RGB {
+	if v == nil {
+		return RGB{fallback, fallback, fallback}
+	}
+	return *v
+}
+
 // getPaletteEndpoints finds the darkest and lightest inks available, which is
 // the range everything has to fit into.
 func getPaletteEndpoints(palette []RGB, black, white *RGB) (RGB, RGB) {
@@ -528,19 +464,11 @@ func getPaletteEndpoints(palette []RGB, black, white *RGB) (RGB, RGB) {
 	return blackOut, whiteOut
 }
 
-func normalizeDynamicRange(o *DynamicRange) *DynamicRange {
-	if o == nil || o.Mode == "off" {
-		return nil
-	}
-	return o
-}
-
 // applyDynamicRange remaps LAB lightness into the panel's range. In "display"
 // mode the source is assumed to span the full 0..100; in "auto" mode the real
 // span is measured from a histogram first, which rescues faded scans.
 func applyDynamicRange(img *Image, o *DynamicRange, palette []RGB) {
-	o = normalizeDynamicRange(o)
-	if o == nil {
+	if o == nil || o.Mode == "off" {
 		return
 	}
 	mode := o.Mode
@@ -592,128 +520,5 @@ func applyDynamicRange(img *Image, o *DynamicRange, palette []RGB) {
 		out := labToRgbWithChromaGuard(src, lab[0], lab[1], lab[2],
 			compressedL, strength*(1-protection))
 		data[i], data[i+1], data[i+2] = out[0], out[1], out[2]
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Level compression
-// ---------------------------------------------------------------------------
-
-func levelMode(o *LevelCompression) string {
-	if o == nil || o.Mode == "" {
-		return "perChannel"
-	}
-	return o.Mode
-}
-
-// levelRGB resolves an optional endpoint colour to a concrete one.
-func levelRGB(v *RGB, fallback uint8) RGB {
-	if v == nil {
-		return RGB{fallback, fallback, fallback}
-	}
-	return *v
-}
-
-func levelScalar(v *RGB, fallback uint8) float64 {
-	if v == nil {
-		return float64(fallback)
-	}
-	return luma709(v[0], v[1], v[2])
-}
-
-// shouldEnableLevelCompression measures how much of the image already sits
-// outside the target range; below the threshold, squeezing it is pointless.
-func shouldEnableLevelCompression(img *Image, mode string, black, white *RGB, autoThreshold float64) bool {
-	data := img.Pix
-	pixelCount := len(data) / 3
-	if pixelCount <= 0 {
-		return false
-	}
-
-	outOfRange := 0
-	if mode == "perChannel" {
-		b := levelRGB(black, 0)
-		w := levelRGB(white, 255)
-		for i := 0; i < len(data); i += 3 {
-			if data[i] < b[0] || data[i] > w[0] ||
-				data[i+1] < b[1] || data[i+1] > w[1] ||
-				data[i+2] < b[2] || data[i+2] > w[2] {
-				outOfRange++
-			}
-		}
-	} else {
-		b := levelScalar(black, 0)
-		w := levelScalar(white, 255)
-		for i := 0; i < len(data); i += 3 {
-			y := luma709(data[i], data[i+1], data[i+2])
-			if y < b || y > w {
-				outOfRange++
-			}
-		}
-	}
-	return float64(outOfRange)/float64(pixelCount) >= autoThreshold
-}
-
-func shouldApplyLevelCompression(img *Image, o *LevelCompression) bool {
-	if o == nil || levelMode(o) == "off" {
-		return false
-	}
-	if o.Auto {
-		return shouldEnableLevelCompression(img, levelMode(o), o.Black, o.White,
-			fv(o.AutoThreshold, 0.01))
-	}
-	return true
-}
-
-// applyLevelCompression squeezes 0..255 into a narrower black and white point,
-// either per channel or along luma with the hue held.
-func applyLevelCompression(img *Image, o *LevelCompression) {
-	if !shouldApplyLevelCompression(img, o) {
-		return
-	}
-
-	data := img.Pix
-	if levelMode(o) == "perChannel" {
-		black := levelRGB(o.Black, 0)
-		white := levelRGB(o.White, 255)
-		var d [3]float64
-		for c := 0; c < 3; c++ {
-			d[c] = float64(white[c]) - float64(black[c])
-			if d[c] <= 0 {
-				return
-			}
-		}
-		for i := 0; i < len(data); i += 3 {
-			for c := 0; c < 3; c++ {
-				data[i+c] = clampByte(float64(black[c]) + float64(data[i+c])*d[c]/255)
-			}
-		}
-		return
-	}
-
-	blackL := levelScalar(o.Black, 0)
-	whiteL := levelScalar(o.White, 255)
-	dL := whiteL - blackL
-	if dL <= 0 {
-		return
-	}
-
-	for i := 0; i < len(data); i += 3 {
-		r, g, b := data[i], data[i+1], data[i+2]
-		y := luma709(r, g, b)
-		yNew := blackL + y*dL/255
-
-		ratio := 0.0
-		if y > 0 {
-			ratio = yNew / y
-		}
-		maxChannel := math.Max(float64(r), math.Max(float64(g), float64(b)))
-		if maxChannel > 0 {
-			ratio = math.Min(ratio, 255/maxChannel)
-		}
-
-		data[i] = clampByte(float64(r) * ratio)
-		data[i+1] = clampByte(float64(g) * ratio)
-		data[i+2] = clampByte(float64(b) * ratio)
 	}
 }

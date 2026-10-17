@@ -23,7 +23,7 @@
  *     el133_init_panel();                  reset + init, ~7 s
  *     el133_stream_begin(0);  el133_stream_write(...) ...  el133_stream_end();
  *     el133_stream_begin(1);  el133_stream_write(...) ...  el133_stream_end();
- *     el133_refresh();                     ~20 s, blocking
+ *     el133_refresh();                     ~35 s, blocking
  *
  * Nothing reaches the glass until el133_refresh(), so an abandoned stream
  * leaves the previous image untouched: skip the refresh and try again.

@@ -14,9 +14,9 @@ Apache License, Version 2.0:
     palette.go   colour-space maths and the calibrated display palettes,
                  from src/dither/processing.ts and
                  src/dither/data/default-palettes.json
-    tone.go      the tone pipeline - paper normalisation, tone mapping,
-                 LAB dynamic range compression, level compression -
-                 from src/dither/processing.ts
+    tone.go      the tone pipeline - paper normalisation, tone mapping
+                 and LAB dynamic range compression - from
+                 src/dither/processing.ts
     dither.go    the diffusion kernels and the palette matching modes,
                  from src/dither/data/diffusion-maps.ts and
                  src/dither/functions/find-closest-palette-color.ts
@@ -47,7 +47,8 @@ the licence, the changes are:
     this repository's own pair of reference palettes, not upstream's.
 
   * Omitted, rather than ported: the "clarity" local-contrast stage, the
-    "fast" dynamic-range-compression path, the WebAssembly kernels, the
+    "fast" dynamic-range-compression path, the level compression stage
+    (which none of the presets use), the WebAssembly kernels, the
     web worker scheduling, the ordered/random/blue-noise/Riemersma/
     simple2D/hueMix/coverage dithering modes, the image-style classifier
     and the automatic preset recommender.

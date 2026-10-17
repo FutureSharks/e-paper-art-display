@@ -246,8 +246,7 @@ void battery_report_previous(bool was_brownout)
   prefs.end();
 
   /* Report the running brownout tally first: it is meaningful even when there
-   * is no refresh record yet, which is the case on the first boot after
-   * flashing firmware that did not write one. */
+   * is no refresh record yet, as on the very first boot. */
   if (brownouts > 0)
     Log.notice("Brownout resets so far: %d" CR, (int)brownouts);
 

@@ -6,9 +6,6 @@
 #include "setup_time.h"
 #include "time.h"
 
-// TimeZone rule for Europe/Berlin including daylight adjustment rules
-const char *time_zone = "CET-1CEST,M3.5.0,M10.5.0/3";
-
 // The clock only has to be roughly right: it exists so TLS can check
 // certificate validity dates, which are measured in months.
 static const time_t CLOCK_SANE = 1700000000; // 2023-11-14
@@ -43,7 +40,7 @@ void time_zone_set()
   // The zone lives in the environment, which does not survive a restart or a
   // deep sleep wake, so set it every boot - even when NTP is skipped. Without
   // it local time is UTC.
-  setenv("TZ", time_zone, 1);
+  setenv("TZ", TIME_ZONE, 1);
   tzset();
 }
 
@@ -69,7 +66,7 @@ bool time_set(bool resync)
 
   ntp_synced = false;
   sntp_set_time_sync_notification_cb(time_available);
-  configTzTime(time_zone, NTP_SERVER);
+  configTzTime(TIME_ZONE, NTP_SERVER);
 
   // Wait for the callback rather than for a plausible clock: on a resync the
   // clock is already plausible before NTP has said anything.

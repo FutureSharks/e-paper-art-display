@@ -10,7 +10,7 @@ profiles:
   #
   # CDCOnBoot=cdc: without it Serial is UART0 on GPIO16/17, which both hides the
   # log (this board has no USB-UART bridge, only the C6's native USB) and takes
-  # the pin BUSY now uses.
+  # the pin BUSY uses.
   default:
     fqbn: esp32:esp32:adafruit_feather_esp32c6:PartitionScheme=huge_app,CDCOnBoot=cdc
     port: /dev/cu.usbmodem1101 # change for your connection

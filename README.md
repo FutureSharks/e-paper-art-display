@@ -62,15 +62,18 @@ To build your own:
 1. Copy the template: `cp src/secrets_template.h src/secrets.h`
 2. Edit `src/secrets.h` with your own values for `WIFI_SSID` and `WIFI_PASSWORD`. If you fork this repo, also change `ART_BASE_URL`
    1. To keep your artwork in a private GitHub repo, point `ART_BASE_URL` at it and set `ART_AUTH_TOKEN` to a fine-grained personal access token with read-only **Contents** access to just that repo. Any other host that accepts a bearer token works the same way. See the comments in [src/secrets_template.h](src/secrets_template.h).
-3. Install the [Arduino CLI](https://arduino.github.io/arduino-cli/latest/installation)
-4. Run `arduino-cli compile` from the root of this repo; the provided [sketch.yaml](sketch.yaml) supplies the board and build settings
-5. Review [src/config.h](src/config.h) and adjust it as needed:
-   1. By default the frame refreshes once a day at 05:00 local time. You can change this; the comments in the file explain how.
+3. Review [src/config.h](src/config.h) and adjust it as needed:
+   1. Set `TIME_ZONE` to your local time zone. It defaults to Europe/Berlin.
+   2. By default the frame refreshes once a day at 05:00 local time. You can change this; the comments in the file explain how.
+4. Install the [Arduino CLI](https://arduino.github.io/arduino-cli/latest/installation)
+5. Run `arduino-cli compile` from the root of this repo; the provided [sketch.yaml](sketch.yaml) supplies the board and build settings
 6. To upload, run `arduino-cli upload --port <your port device>`
 
 ### Adding artwork
 
 Place your artwork images in `artwork/`, run `imgproc` (`go run ./tools/imgproc`) to process them, then commit the files in `artwork/processed/` and push.
+
+The source images are not committed, only the packed frames, so a fresh clone has frames with no sources. `imgproc` deletes any frame whose source is missing, so its first run in a fresh clone replaces the included artwork with just your own. The included frames were packed with `-preset dynamic`, whereas `imgproc` defaults to `balanced`. See [tools/imgproc](tools/imgproc) for the presets, and for how to replace the built-in error screen.
 
 To find artwork, [tools/art-fetcher](tools/art-fetcher) (`go run ./tools/art-fetcher`) downloads public-domain, portrait-orientation paintings from Wikimedia Commons into `tools/art-fetcher/downloads/`. Copy the ones you want into `artwork/`.
 

@@ -1,12 +1,12 @@
 /* e-paper-art-display: an e-paper art frame.
  *
- * The device wakes, fetches a pre-processed image from artwork/processed/ over
+ * The device wakes, fetches a pre-processed image over
  * HTTPS, streams it straight into the panel, and sleeps again. The frame is
  * never held in memory, so this runs on a C6 with no PSRAM. When that fails -
  * no WiFi, no clock, a failed download, or a flat battery - it shows an error
  * image built into the firmware instead (src/error_screen.h).
  *
- * Hardware: XIAO ESP32-C6 + Pimoroni Inky Impression 13.3" (EL133UF1).
+ * Hardware: Adafruit Feather ESP32-C6 + Pimoroni Inky Impression 13.3" (EL133UF1).
  * Wiring:   libs/el133/src/el133_pins.h
  * Settings: src/config.h, credentials in src/secrets.h
  * Images:   tools/imgproc turns artwork/*.jpg into the panel's byte format.
@@ -29,13 +29,8 @@
 #include "src/setup_wifi.h"
 #include "src/status_line.h"
 
-#ifndef ART_BASE_URL
-#error "ART_BASE_URL is not set: copy it from src/secrets_template.h into src/secrets.h"
-#endif
-
-/* A secrets.h made before ART_AUTH_TOKEN existed: no token, public artwork. */
-#ifndef ART_AUTH_TOKEN
-#define ART_AUTH_TOKEN ""
+#if !defined(ART_BASE_URL) || !defined(ART_AUTH_TOKEN)
+#error "src/secrets.h needs ART_BASE_URL and ART_AUTH_TOKEN: copy them from src/secrets_template.h"
 #endif
 
 static const uint64_t US_PER_SECOND = 1000000ULL;

@@ -3,14 +3,17 @@
 
 #include <ArduinoLog.h>
 
-// The local timezone is set by the POSIX TZ rule in src/setup_time.cpp,
-// not here - change it there.
-
 // The artwork source, ART_BASE_URL, is set in src/secrets.h.
+
+// ===== Time Zone =====
+// A POSIX TZ rule, including the daylight saving dates. This one is
+// Europe/Berlin. For other zones see the second column of
+// https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+#define TIME_ZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 
 // ===== Display Cycle =====
 // Choose one schedule: a fixed local time each day, or a fixed interval.
-#define DISPLAY_UPDATE_TIME "" // Refresh once a day at this local time, 24 h "HH:MM".
+#define DISPLAY_UPDATE_TIME "05:00" // Refresh once a day at this local time, 24 h "HH:MM".
                                     // Set to "" to refresh every SLEEP_MINUTES instead
 #define SLEEP_MINUTES 30      // Sleep between image refresh when DISPLAY_UPDATE_TIME is "".
                               // Also the wait before retrying a failed WiFi, NTP or download.

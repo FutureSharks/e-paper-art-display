@@ -26,10 +26,6 @@ static const size_t ARTFEED_CHUNK = 2048;
 /* A manifest is one filename per line; this caps how many we will consider. */
 static const size_t ARTFEED_MAX_ENTRIES = 512;
 
-/* Any clock at or past this (2023-11-14) is good enough to check a certificate
- * against. Below it, the clock has not been set since power-on. */
-static const time_t ARTFEED_CLOCK_SANE = 1700000000;
-
 static ArtfeedError last_error;
 
 const ArtfeedError &artfeed_last_error()
@@ -86,15 +82,6 @@ ArtfeedConfig artfeed_default_config()
     cfg.http_timeout_ms = 20000;
     cfg.on_stage = nullptr;
     return cfg;
-}
-
-uint32_t artfeed_next_index()
-{
-    Preferences prefs;
-    prefs.begin("artfeed", true);
-    uint32_t pos = prefs.getUInt("seq", 0);
-    prefs.end();
-    return pos;
 }
 
 static bool has_token(const ArtfeedConfig &cfg)
@@ -308,7 +295,6 @@ bool artfeed_show(const ArtfeedConfig &cfg, const char *name)
      * enough that the receive window fills and the connection stalls or the
      * server drops it. Nothing is displayed until the refresh, so paying this
      * cost before we know the download will succeed is harmless. */
-    uint32_t t0 = millis();
     el133_init_panel();
 
     NetworkClientSecure client;
@@ -341,7 +327,7 @@ bool artfeed_show(const ArtfeedConfig &cfg, const char *name)
 
     report(cfg, ARTFEED_STAGE_DOWNLOAD);
     Log.notice("Streaming %u bytes" CR, (unsigned)EL133_STREAM_BYTES);
-    t0 = millis();
+    const uint32_t t0 = millis();
 
     WiFiClient *stream = http.getStreamPtr();
     uint8_t buf[ARTFEED_CHUNK];

@@ -12,7 +12,7 @@
 #include <SPI.h>
 
 /* Conservative: Pimoroni runs 10 MHz. The frame takes a few seconds to send
- * either way, against a refresh of ~20 s. */
+ * either way, against a refresh of ~35 s. */
 static const SPISettings SPI_CFG(4000000, MSBFIRST, SPI_MODE0);
 
 static const uint32_t CMD_SETUP_MS = 300; /* D/C low to opcode; shorter drops commands */

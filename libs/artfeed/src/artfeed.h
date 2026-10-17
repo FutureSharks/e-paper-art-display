@@ -82,7 +82,3 @@ struct ArtfeedError
 };
 
 const ArtfeedError &artfeed_last_error();
-
-/* Which manifest entry the next sequential pick will use, and how many were
- * seen last time. Both read back from NVS, for logging and diagnostics. */
-uint32_t artfeed_next_index();

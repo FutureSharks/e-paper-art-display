@@ -23,6 +23,7 @@
 //	go run ./tools/imgproc -fit contain           # letterbox instead of cropping
 //	go run ./tools/imgproc -random-prefix         # shuffle the manifest order the device steps through
 //	go run ./tools/imgproc -list-presets          # and -list-palettes, -list-kernels
+//	go run ./tools/imgproc -error-image oops.jpg  # replace the built-in error screen
 //
 // Alongside each source image it writes a PNG preview of the dithered result:
 // by default the exact cropped 1200x1600 frame the panel will show, painted in
@@ -41,6 +42,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"compress/zlib"
 	"flag"
 	"fmt"
 	"image"
@@ -67,13 +70,9 @@ const (
 )
 
 // previewSuffix replaces the source's extension, so artwork/foo.jpg gets
-// artwork/foo.preview.png. findSources skips anything matching it, or the
-// next run would treat previews as new source images. legacyPreviewSuffix is
-// what earlier versions wrote; it is removed when a new preview is written.
-const (
-	previewSuffix       = ".preview.png"
-	legacyPreviewSuffix = ".preview.jpg"
-)
+// artwork/foo.preview.png. findSources skips previews, or the next run would
+// treat them as new source images.
+const previewSuffix = ".preview.png"
 
 type config struct {
 	palette       [6]PaletteEntry
@@ -132,6 +131,11 @@ func main() {
 		"prefix each frame with 4 random characters (abcd_name.bin) so a sorted manifest is shuffled; "+
 			"prefixes are kept between runs, -force re-rolls them")
 
+	errorImage := flag.String("error-image", "",
+		"pack this one image as the firmware's built-in error screen, write it to -error-header and exit")
+	errorHeader := flag.String("error-header", "src/error_image.h",
+		"the C header -error-image writes")
+
 	listPalettes := flag.Bool("list-palettes", false, "print the available palettes and exit")
 	listPresets := flag.Bool("list-presets", false, "print the available presets and exit")
 	listKernels := flag.Bool("list-kernels", false, "print the available dither kernels and exit")
@@ -161,6 +165,15 @@ func main() {
 		*previewSource, *previewColors, *saturation, *serpentine, *writePreview)
 	if err != nil {
 		fatalf("%v", err)
+	}
+
+	if *errorImage != "" {
+		fmt.Printf("%s\n\n", cfg.fingerprint())
+		if err := writeErrorHeader(*errorImage, *errorHeader, cfg); err != nil {
+			fatalf("%v", err)
+		}
+		fmt.Printf("  %s -> %s\n", *errorImage, *errorHeader)
+		return
 	}
 
 	sources, err := findSources(*in)
@@ -207,7 +220,11 @@ func main() {
 			continue
 		}
 
-		if err := process(src, dst, previewPath, cfg); err != nil {
+		frame, err := process(src, previewPath, cfg)
+		if err == nil {
+			err = os.WriteFile(dst, frame, 0o644)
+		}
+		if err != nil {
 			// One bad file should not stop the batch; it just will not appear
 			// in the manifest, so the device never asks for it.
 			fmt.Fprintf(os.Stderr, "  %-44s FAILED: %v\n", filepath.Base(src), err)
@@ -413,10 +430,6 @@ func previewPathFor(src string) string {
 	return strings.TrimSuffix(src, filepath.Ext(src)) + previewSuffix
 }
 
-func legacyPreviewPathFor(src string) string {
-	return strings.TrimSuffix(src, filepath.Ext(src)) + legacyPreviewSuffix
-}
-
 func findSources(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -424,12 +437,9 @@ func findSources(dir string) ([]string, error) {
 	}
 	var out []string
 	for _, e := range entries {
-		if e.IsDir() || strings.HasSuffix(strings.ToLower(e.Name()), previewSuffix) {
-			continue
-		}
 		// Preview renders live alongside the originals; they are derived
 		// images, not sources, and packing them would duplicate every piece.
-		if strings.Contains(strings.ToLower(e.Name()), ".preview") {
+		if e.IsDir() || strings.Contains(strings.ToLower(e.Name()), ".preview") {
 			continue
 		}
 		switch strings.ToLower(filepath.Ext(e.Name())) {
@@ -462,16 +472,18 @@ func upToDate(src, dst, previewPath string, wantPreview bool) bool {
 	return true
 }
 
-func process(src, dst, previewPath string, cfg config) error {
+// process packs src into a panel frame, and writes its preview if cfg asks
+// for one.
+func process(src, previewPath string, cfg config) ([]byte, error) {
 	f, err := os.Open(src)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
 
 	img, _, err := image.Decode(bufio.NewReader(f))
 	if err != nil {
-		return fmt.Errorf("decoding: %w", err)
+		return nil, fmt.Errorf("decoding: %w", err)
 	}
 
 	pal := newMatchPalette(cfg.dither[:], cfg.matchMode)
@@ -483,12 +495,13 @@ func process(src, dst, previewPath string, cfg config) error {
 	applyImageProcessing(frame, cfg.processing, cfg.dither[:])
 	indices := errorDiffuse(frame, pal, cfg.kernel, cfg.serpentine)
 
-	if err := writeFrame(dst, indices); err != nil {
-		return err
+	packed, err := packFrame(indices)
+	if err != nil {
+		return nil, err
 	}
 
 	if !cfg.writePreview {
-		return nil
+		return packed, nil
 	}
 
 	previewIndices, w, h := indices, portraitW, portraitH
@@ -505,11 +518,9 @@ func process(src, dst, previewPath string, cfg config) error {
 	}
 
 	if err := writePNG(previewPath, previewIndices, w, h, cfg.preview[:]); err != nil {
-		return err
+		return nil, err
 	}
-	// Superseded by the PNG; leaving it would show a stale result next to it.
-	os.Remove(legacyPreviewPathFor(src))
-	return nil
+	return packed, nil
 }
 
 // toImage copies a decoded image into the byte buffer the stages work on.
@@ -594,11 +605,11 @@ func bilinear(src image.Image, b image.Rectangle, sw, sh int, fx, fy float64) (f
 	return r, g, bl
 }
 
-// writeFrame splits the portrait image at column 600, one half per controller,
+// packFrame splits the portrait image at column 600, one half per controller,
 // and packs two pixels per byte. The image is already in scan order, so this is
 // a straight walk across it - which is what lets the device stream from a
 // socket to SPI without a framebuffer.
-func writeFrame(dst string, indices []uint8) error {
+func packFrame(indices []uint8) ([]byte, error) {
 	buf := make([]byte, 0, streamBytes)
 
 	for half := 0; half < 2; half++ {
@@ -615,9 +626,52 @@ func writeFrame(dst string, indices []uint8) error {
 	}
 
 	if len(buf) != streamBytes {
-		return fmt.Errorf("packed %d bytes, expected %d", len(buf), streamBytes)
+		return nil, fmt.Errorf("packed %d bytes, expected %d", len(buf), streamBytes)
 	}
-	return os.WriteFile(dst, buf, 0o644)
+	return buf, nil
+}
+
+// writeErrorHeader packs src as the firmware's built-in error screen: one
+// frame, zlib-compressed, as a C array. The device inflates it straight into
+// the panel, so it costs a third of the flash a raw frame would.
+func writeErrorHeader(src, dst string, cfg config) error {
+	packed, err := process(src, previewPathFor(src), cfg)
+	if err != nil {
+		return fmt.Errorf("%s: %w", src, err)
+	}
+
+	var z bytes.Buffer
+	zw, err := zlib.NewWriterLevel(&z, zlib.BestCompression)
+	if err != nil {
+		return err
+	}
+	if _, err := zw.Write(packed); err != nil {
+		return err
+	}
+	if err := zw.Close(); err != nil {
+		return err
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "// %s as one packed %d-byte frame, zlib-compressed.\n",
+		filepath.Base(src), streamBytes)
+	sb.WriteString("// Generated by tools/imgproc -error-image, with:\n")
+	sb.WriteString("// " + cfg.fingerprint() + "\n")
+	sb.WriteString("#pragma once\n\n#include <stdint.h>\n\n")
+	fmt.Fprintf(&sb, "static const uint8_t ERROR_IMAGE_ZLIB[%d] = {\n", z.Len())
+	for i, b := range z.Bytes() {
+		if i%16 == 0 {
+			sb.WriteString("    ")
+		}
+		fmt.Fprintf(&sb, "0x%02X,", b)
+		if i%16 == 15 || i == z.Len()-1 {
+			sb.WriteByte('\n')
+		} else {
+			sb.WriteByte(' ')
+		}
+	}
+	sb.WriteString("};\n")
+	return os.WriteFile(dst, []byte(sb.String()), 0o644)
 }
 
 // writePNG stores the palette indices directly as a paletted PNG. With six

@@ -112,7 +112,7 @@ func TestLabRoundTrip(t *testing.T) {
 	}
 }
 
-// Every palette must supply all six panel roles, or writeFrame would index a
+// Every palette must supply all six panel roles, or packFrame would index a
 // colour the controller has no code for.
 func TestPalettesCoverPanelRoles(t *testing.T) {
 	for _, name := range paletteNames() {
