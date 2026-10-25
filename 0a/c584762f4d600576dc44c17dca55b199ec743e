@@ -1,0 +1,16 @@
+README.md
+  h_61c37ecb9a0034 11-12
+.gitignore
+  h_61c37ecb9a0034 20-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "0ac584762f4d600576dc44c17dca55b199ec743e",
+  "prompts": {},
+  "humans": {
+    "h_61c37ecb9a0034": {
+      "author": "Max Williams <futuresharks@gmail.com>"
+    }
+  }
+}
