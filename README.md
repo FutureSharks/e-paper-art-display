@@ -8,6 +8,8 @@ A battery-powered, e-paper daily art display.
 
 An ESP32 microcontroller wakes on a schedule, connects to Wi-Fi, downloads a piece of art and shows it on a 13.3" color e-paper panel. The artwork image is preprocessed locally using [tools/imgproc](tools/imgproc), then pushed to GitHub or any static content serving host. Because the panel holds the image with no power consumption, the battery is only used while the image is changing, so battery life can be months or even years with a daily image refresh.
 
+Example artwork, with preprossed "preview" images, are in [artwork](artwork).
+
 ## Hardware
 
 An [Adafruit Feather ESP32-C6](https://learn.adafruit.com/adafruit-esp32-c6-feather) controls a [Pimoroni Inky Impression 13.3"](https://www.berrybase.de/en/pimoroni-inky-impression-13-3-epaper-display-fuer-raspberry-pi-spectra-6-1600x1200-6-farben-gpio) display. This display module uses a 1200×1600 (portrait) E Ink Spectra 6 panel (model `EL133UF1`). A full refresh takes about 35 seconds.

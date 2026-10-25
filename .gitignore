@@ -17,6 +17,27 @@ artwork/*.jpeg
 artwork/*.JPG
 artwork/*.png
 
+# Will include these in the repo as an example
+# Created by running "go run ./tools/imgproc -preset dynamic -random-prefix"
+!artwork/003_jan-van-eyck_portrait-of-a-man-self-portrait.jpg
+!artwork/003_jan-van-eyck_portrait-of-a-man-self-portrait.preview.png
+!artwork/004_johannes-vermeer_girl-with-a-pearl-earring.jpg
+!artwork/004_johannes-vermeer_girl-with-a-pearl-earring.preview.png
+!artwork/009_sandro-botticelli_idealized-portrait-of-a-lady-portrait-of-simonetta.png
+!artwork/009_sandro-botticelli_idealized-portrait-of-a-lady-portrait-of-simonetta.preview.png
+!artwork/013_alexej-von-jawlensky_lady-with-fan.jpg
+!artwork/013_alexej-von-jawlensky_lady-with-fan.preview.png
+!artwork/034_august-macke_woman-supporting-a-flower-bowl.jpg
+!artwork/034_august-macke_woman-supporting-a-flower-bowl.preview.png
+!artwork/036_edvard-munch_the-scream.jpg
+!artwork/036_edvard-munch_the-scream.preview.png
+!artwork/070_henri-matisse_blues-nudes.jpg
+!artwork/070_henri-matisse_blues-nudes.preview.png
+!artwork/126_vincent-van-gogh_road-with-cypress-and-star.jpg
+!artwork/126_vincent-van-gogh_road-with-cypress-and-star.preview.png
+!artwork/53113.jpg
+!artwork/53113.preview.png
+
 # art-fetcher
 tools/art-fetcher/downloads/
 
